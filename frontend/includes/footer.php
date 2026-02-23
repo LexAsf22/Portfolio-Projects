@@ -1,6 +1,17 @@
-</div> <!-- container -->
-<footer style="text-align:center; padding:1rem; background:#d5ecd5; color:#2a4d2a;">
-    &copy; <?php echo date("Y"); ?> College Laboratory & Classroom Management System
+</div> <!-- end content -->
+
+<footer style="
+    margin-left:220px;
+    text-align:center;
+    padding:15px;
+    background:#ffffff;
+    border-top:1px solid #ddd;
+    font-size:14px;
+    color:#777;
+">
+© <?php echo date("Y"); ?> Campus Laboratory Management System  
+All Rights Reserved
 </footer>
+
 </body>
 </html>

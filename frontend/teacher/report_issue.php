@@ -1,65 +1,79 @@
 <?php
-require '../../backend/helpers.php';
-require_role('teacher');
+include("../../backend/config/database.php");
+include("../../backend/config/auth.php");
+include("../../backend/config/helpers.php");
 
-$labs = $pdo->query("SELECT * FROM labs")->fetchAll();
-$error = '';
-$success = '';
+requireRole('teacher');
+include("../includes/header.php");
 
-if($_SERVER['REQUEST_METHOD'] === 'POST'){
-    $lab_id = $_POST['lab_id'];
-    $category = $_POST['category'];
-    $priority = $_POST['priority'];
-    $description = $_POST['description'];
+$message="";
 
-    if(create_issue($lab_id, $_SESSION['user']['id'], $category, $priority, $description)){
-        $success = "Issue reported successfully!";
-    } else {
-        $error = "Failed to report issue.";
+if(isset($_POST['submit'])){
+    $userId=user()['id'];
+    $campus=$_POST['campus'];
+    $room=$_POST['room'];
+    $category=$_POST['category'];
+    $priority=$_POST['priority'];
+
+    $stmt=$conn->prepare("INSERT INTO issues(user_id,campus,room,category,priority)
+                          VALUES(?,?,?,?,?)");
+    $stmt->bind_param("issss",$userId,$campus,$room,$category,$priority);
+
+    if($stmt->execute()){
+        $message=alert("Issue reported successfully!","success");
     }
 }
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Report Issue</title>
-    <link rel="stylesheet" href="../assets/style.css">
-</head>
-<body>
-<header style="background:#2a4d2a; color:white; padding:1rem;">
-    <h1>Report Classroom/Lab Issue</h1>
-</header>
-<nav style="background:#3a7d3a; padding:1rem;">
-    <a href="dashboard.php" style="color:white; margin-right:1rem;">Dashboard</a>
-    <a href="report_issue.php" style="color:white;">Report Issue</a>
-</nav>
-<div style="padding:2rem; background:#eaf4ea;">
-    <?php if($error) echo "<p style='color:red;'>$error</p>"; ?>
-    <?php if($success) echo "<p style='color:green;'>$success</p>"; ?>
-    <form method="POST">
-        Lab: 
-        <select name="lab_id" required>
-            <?php foreach($labs as $lab): ?>
-            <option value="<?php echo $lab['id']; ?>"><?php echo $lab['name']; ?></option>
-            <?php endforeach; ?>
-        </select><br><br>
-        Category: 
-        <select name="category" required>
-            <option value="equipment">Equipment</option>
-            <option value="furniture">Furniture</option>
-            <option value="AC">AC</option>
-            <option value="internet">Internet</option>
-        </select><br><br>
-        Priority:
-        <select name="priority" required>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-        </select><br><br>
-        Description:<br>
-        <textarea name="description" rows="4" cols="50" required></textarea><br><br>
-        <button type="submit">Report Issue</button>
-    </form>
-</div>
-</body>
-</html>
+
+<style>
+form{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    max-width:450px;
+}
+input,select{
+    width:100%;
+    padding:8px;
+    margin:8px 0;
+}
+button{
+    padding:10px;
+    background:#e67e22;
+    color:white;
+    border:none;
+}
+</style>
+
+<h2>Report Classroom / Lab Issue</h2>
+
+<?=$message?>
+
+<form method="POST">
+
+<select name="campus" required>
+<option value="">Select Campus</option>
+<option value="Campus A">Campus A</option>
+<option value="Campus B">Campus B</option>
+</select>
+
+<input type="text" name="room" placeholder="Room Name" required>
+
+<select name="category" required>
+<option value="Electrical">Electrical</option>
+<option value="Computer">Computer</option>
+<option value="Furniture">Furniture</option>
+<option value="Network">Network</option>
+</select>
+
+<select name="priority" required>
+<option value="Low">Low</option>
+<option value="Medium">Medium</option>
+<option value="High">High</option>
+</select>
+
+<button name="submit">Submit Issue</button>
+
+</form>
+
+<?php include("../includes/footer.php"); ?>

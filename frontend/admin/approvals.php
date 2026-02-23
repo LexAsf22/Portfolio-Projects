@@ -1,57 +1,71 @@
 <?php
-require '../../backend/helpers.php';
-require_role('admin');
+include("../../backend/config/database.php");
+include("../../backend/config/auth.php");
+include("../../backend/config/helpers.php");
+requireRole('admin');
 
-$pending_bookings = get_pending_bookings();
-
-// Approve/Reject handler
-if(isset($_GET['action'], $_GET['id'])) {
-    $status = ($_GET['action'] === 'approve') ? 'approved' : 'rejected';
-    update_booking_status($_GET['id'], $status);
+if(isset($_GET['approve'])){
+    $conn->query("UPDATE reservations SET status='Approved' WHERE id=".$_GET['approve']);
     header("Location: approvals.php");
-    exit();
+}
+if(isset($_GET['reject'])){
+    $conn->query("UPDATE reservations SET status='Rejected' WHERE id=".$_GET['reject']);
+    header("Location: approvals.php");
 }
 ?>
+
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Approve Lab Bookings</title>
-    <link rel="stylesheet" href="../assets/style.css">
+<title>Approve Lab Bookings</title>
+<style>
+body{font-family:Arial;background:#f4f6f9;margin:0;}
+.content{padding:20px;}
+table{width:100%;border-collapse:collapse;background:white;}
+th,td{padding:10px;border:1px solid #ddd;text-align:center;}
+a{padding:5px 10px;text-decoration:none;border-radius:5px;color:white;}
+.approve{background:#27ae60;}
+.reject{background:#e74c3c;}
+</style>
 </head>
 <body>
-<header style="background:#2a4d2a; color:white; padding:1rem;">
-    <h1>Approve Lab Bookings</h1>
-</header>
-<nav style="background:#3a7d3a; padding:1rem;">
-    <a href="dashboard.php" style="color:white; margin-right:1rem;">Dashboard</a>
-    <a href="approvals.php" style="color:white;">Approve Bookings</a>
-</nav>
-<div style="padding:2rem;">
-    <table border="1" cellpadding="10" style="width:100%; background:white; border-collapse:collapse;">
-        <tr style="background:#d5ecd5;">
-            <th>ID</th>
-            <th>Student</th>
-            <th>Lab</th>
-            <th>Equipment IDs</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Action</th>
-        </tr>
-        <?php foreach($pending_bookings as $b): ?>
-        <tr>
-            <td><?php echo $b['id']; ?></td>
-            <td><?php echo $b['student_name']; ?></td>
-            <td><?php echo $b['lab_name']; ?></td>
-            <td><?php echo $b['equipment_ids']; ?></td>
-            <td><?php echo $b['start_time']; ?></td>
-            <td><?php echo $b['end_time']; ?></td>
-            <td>
-                <a href="?action=approve&id=<?php echo $b['id']; ?>">Approve</a> |
-                <a href="?action=reject&id=<?php echo $b['id']; ?>">Reject</a>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-    </table>
+
+<div class="content">
+<h2>Pending Reservations</h2>
+
+<table>
+<tr>
+<th>Student</th>
+<th>Lab</th>
+<th>Date</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+
+<?php
+$sql="SELECT r.*, u.name, l.lab_name 
+      FROM reservations r
+      JOIN users u ON r.user_id=u.id
+      JOIN labs l ON r.lab_id=l.id
+      WHERE r.status='Pending'";
+
+$result=$conn->query($sql);
+
+while($row=$result->fetch_assoc()){
+echo "<tr>
+<td>".e($row['name'])."</td>
+<td>".e($row['lab_name'])."</td>
+<td>".formatDate($row['date'])."</td>
+<td>".statusBadge($row['status'])."</td>
+<td>
+<a class='approve' href='?approve={$row['id']}'>Approve</a>
+<a class='reject' href='?reject={$row['id']}'>Reject</a>
+</td>
+</tr>";
+}
+?>
+</table>
+
 </div>
 </body>
 </html>

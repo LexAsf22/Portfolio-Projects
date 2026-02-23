@@ -1,78 +1,60 @@
 <?php
-require '../../backend/helpers.php';
-require_role('student');
+include("../../backend/config/database.php");
+include("../../backend/config/auth.php");
+include("../../backend/config/helpers.php");
 
-$labs = get_labs();
-$success = $error = '';
+requireRole('student');
+include("../includes/header.php");
 
-if($_SERVER['REQUEST_METHOD'] === 'POST'){
-    $lab_id = $_POST['lab_id'];
-    $equipment_ids = $_POST['equipment'] ?? [];
-    $start_time = $_POST['start_time'];
-    $end_time = $_POST['end_time'];
+$message="";
 
-    // Check availability
-    $available = true;
-    foreach($equipment_ids as $eid){
-        if(!check_equipment_availability($eid, $start_time, $end_time)){
-            $available = false;
-            break;
-        }
-    }
+if(isset($_POST['reserve'])){
+    $equipment=$_POST['equipment_id'];
+    $userId=user()['id'];
+    $date=$_POST['date'];
 
-    if($available && create_booking($_SESSION['user']['id'], $lab_id, $equipment_ids, $start_time, $end_time)){
-        $success = "Equipment reservation requested successfully!";
-    } else {
-        $error = "Equipment not available or reservation failed.";
-    }
+    $stmt=$conn->prepare("INSERT INTO reservations(user_id,lab_id,date) VALUES(?,?,?)");
+    $stmt->bind_param("iis",$userId,$equipment,$date);
+    $stmt->execute();
+
+    $message=alert("Equipment reservation submitted!","success");
 }
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Reserve Equipment</title>
-    <link rel="stylesheet" href="../assets/style.css">
-</head>
-<body>
-<header style="background:#2a4d2a; color:white; padding:1rem;">
-    <h1>Reserve Equipment</h1>
-</header>
-<nav style="background:#3a7d3a; padding:1rem;">
-    <a href="dashboard.php" style="color:white; margin-right:1rem;">Dashboard</a>
-    <a href="reserve_equipment.php" style="color:white;">Reserve Equipment</a>
-</nav>
-<div style="padding:2rem; background:#eaf4ea;">
-    <?php if($error) echo "<p style='color:red;'>$error</p>"; ?>
-    <?php if($success) echo "<p style='color:green;'>$success</p>"; ?>
 
-    <form method="POST">
-        Lab:
-        <select name="lab_id" id="lab_select" required onchange="fetchEquipment(this.value)">
-            <option value="">Select Lab</option>
-            <?php foreach($labs as $lab): ?>
-            <option value="<?php echo $lab['id']; ?>"><?php echo $lab['name']; ?></option>
-            <?php endforeach; ?>
-        </select><br><br>
-        Equipment:<br>
-        <div id="equipment_list">Select a lab to load equipment</div><br>
-        Start Time: <input type="datetime-local" name="start_time" required><br><br>
-        End Time: <input type="datetime-local" name="end_time" required><br><br>
-        <button type="submit">Reserve Equipment</button>
-    </form>
-</div>
-<script>
-function fetchEquipment(labId){
-    const equipmentDiv = document.getElementById('equipment_list');
-    fetch('../../backend/get_equipment.php?lab_id='+labId)
-        .then(res => res.json())
-        .then(data => {
-            let html = '';
-            data.forEach(e => {
-                html += `<input type="checkbox" name="equipment[]" value="${e.id}">${e.name} (${e.type})<br>`;
-            });
-            equipmentDiv.innerHTML = html;
-        });
+<style>
+form{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    max-width:400px;
 }
-</script>
-</body>
-</html>
+</style>
+
+<h2>Reserve Equipment</h2>
+
+<?=$message?>
+
+<form method="POST">
+
+<select name="equipment_id" required>
+<option value="">Select Equipment</option>
+<?php
+$equip=$conn->query("SELECT e.*, l.lab_name 
+                     FROM equipment e
+                     JOIN labs l ON e.lab_id=l.id");
+
+while($row=$equip->fetch_assoc()){
+echo "<option value='{$row['lab_id']}'>
+{$row['name']} ({$row['lab_name']})
+</option>";
+}
+?>
+</select>
+
+<input type="date" name="date" required>
+
+<button name="reserve">Reserve</button>
+
+</form>
+
+<?php include("../includes/footer.php"); ?>

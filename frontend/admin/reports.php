@@ -1,42 +1,44 @@
 <?php
-require '../../backend/helpers.php';
-require_role('admin');
+include("../../backend/config/database.php");
+include("../../backend/config/auth.php");
+include("../../backend/config/helpers.php");
+requireRole('admin');
 
-// Example: Daily booking counts
-$daily_bookings = $pdo->query("SELECT DATE(start_time) as day, COUNT(*) as total FROM bookings GROUP BY DATE(start_time)")->fetchAll();
+$totalReservations = $conn->query("SELECT COUNT(*) as total FROM reservations")->fetch_assoc()['total'];
+$totalApproved = $conn->query("SELECT COUNT(*) as total FROM reservations WHERE status='Approved'")->fetch_assoc()['total'];
+$totalIssues = $conn->query("SELECT COUNT(*) as total FROM issues")->fetch_assoc()['total'];
 ?>
+
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Reports & Analytics</title>
-    <link rel="stylesheet" href="../assets/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<title>Reports & Analytics</title>
+<style>
+body{font-family:Arial;background:#f4f6f9;padding:20px;}
+.card{
+background:white;padding:20px;margin:10px 0;
+border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+</style>
 </head>
 <body>
-<header style="background:#2a4d2a; color:white; padding:1rem;">
-    <h1>Reports & Analytics</h1>
-</header>
-<nav style="background:#3a7d3a; padding:1rem;">
-    <a href="dashboard.php" style="color:white; margin-right:1rem;">Dashboard</a>
-    <a href="reports.php" style="color:white;">Reports</a>
-</nav>
-<div style="padding:2rem; background:#eaf4ea;">
-    <canvas id="dailyBookingsChart" width="600" height="300"></canvas>
+
+<h2>System Reports</h2>
+
+<div class="card">
+<h3>Total Reservations</h3>
+<?=$totalReservations;?>
 </div>
-<script>
-const ctx = document.getElementById('dailyBookingsChart').getContext('2d');
-const chart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-        labels: [<?php foreach($daily_bookings as $d){ echo "'".$d['day']."',"; } ?>],
-        datasets: [{
-            label: 'Bookings per Day',
-            data: [<?php foreach($daily_bookings as $d){ echo $d['total'].','; } ?>],
-            backgroundColor: 'rgba(42,77,42,0.7)'
-        }]
-    },
-    options: { responsive: true }
-});
-</script>
+
+<div class="card">
+<h3>Approved Reservations</h3>
+<?=$totalApproved;?>
+</div>
+
+<div class="card">
+<h3>Total Issues Reported</h3>
+<?=$totalIssues;?>
+</div>
+
 </body>
 </html>

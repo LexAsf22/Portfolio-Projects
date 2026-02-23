@@ -1,44 +1,49 @@
 <?php
-require '../../backend/helpers.php';
-require_role('student');
+include("../../backend/config/database.php");
+include("../../backend/config/auth.php");
+include("../../backend/config/helpers.php");
 
-$computers = $pdo->query("SELECT * FROM equipment WHERE type='computer'")->fetchAll();
+requireRole('student');
+include("../includes/header.php");
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Available Computers</title>
-    <link rel="stylesheet" href="../assets/style.css">
-</head>
-<body>
-<header style="background:#2a4d2a; color:white; padding:1rem;">
-    <h1>Available Computers</h1>
-</header>
-<nav style="background:#3a7d3a; padding:1rem;">
-    <a href="dashboard.php" style="color:white; margin-right:1rem;">Dashboard</a>
-    <a href="view_computers.php" style="color:white;">View Computers</a>
-</nav>
-<div style="padding:2rem;">
-    <table border="1" cellpadding="10" style="width:100%; background:white; border-collapse:collapse;">
-        <tr style="background:#d5ecd5;">
-            <th>ID</th>
-            <th>Name</th>
-            <th>Lab</th>
-            <th>Status</th>
-        </tr>
-        <?php foreach($computers as $c): ?>
-        <tr>
-            <td><?php echo $c['id']; ?></td>
-            <td><?php echo $c['name']; ?></td>
-            <td><?php 
-                $lab = $pdo->prepare("SELECT name FROM labs WHERE id=?"); 
-                $lab->execute([$c['lab_id']]); 
-                echo $lab->fetchColumn();
-            ?></td>
-            <td><?php echo $c['status']; ?></td>
-        </tr>
-        <?php endforeach; ?>
-    </table>
-</div>
-</body>
-</html>
+
+<style>
+table{
+    width:100%;
+    background:white;
+    border-collapse:collapse;
+}
+th,td{
+    padding:10px;
+    border-bottom:1px solid #ddd;
+}
+</style>
+
+<h2>Available Computers</h2>
+
+<table>
+<tr>
+<th>Lab</th>
+<th>Equipment</th>
+<th>Quantity</th>
+</tr>
+
+<?php
+$sql="SELECT e.*, l.lab_name
+      FROM equipment e
+      JOIN labs l ON e.lab_id=l.id
+      WHERE e.name LIKE '%Computer%' AND e.quantity > 0";
+
+$result=$conn->query($sql);
+
+while($row=$result->fetch_assoc()){
+echo "<tr>
+<td>{$row['lab_name']}</td>
+<td>{$row['name']}</td>
+<td>{$row['quantity']}</td>
+</tr>";
+}
+?>
+</table>
+
+<?php include("../includes/footer.php"); ?>
