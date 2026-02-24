@@ -1,71 +1,76 @@
 <?php
-include("../../backend/config/database.php");
-include("../../backend/config/auth.php");
-include("../../backend/config/helpers.php");
-requireRole('admin');
+include("../includes/header.php");
+checkRole('admin');
 
 if(isset($_GET['approve'])){
-    $conn->query("UPDATE reservations SET status='Approved' WHERE id=".$_GET['approve']);
-    header("Location: approvals.php");
+    $id = $_GET['approve'];
+    $conn->query("UPDATE reservations SET status='Approved' WHERE id=$id");
+    setFlash("Reservation approved!", "success");
 }
 if(isset($_GET['reject'])){
-    $conn->query("UPDATE reservations SET status='Rejected' WHERE id=".$_GET['reject']);
-    header("Location: approvals.php");
+    $id = $_GET['reject'];
+    $conn->query("UPDATE reservations SET status='Rejected' WHERE id=$id");
+    setFlash("Reservation rejected!", "error");
 }
+
+$reservations = $conn->query("SELECT r.*, u.name as student_name, l.lab_name 
+                               FROM reservations r
+                               JOIN users u ON r.user_id=u.id
+                               JOIN laboratories l ON r.lab_id=l.id
+                               WHERE r.status='Pending'");
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-<title>Approve Lab Bookings</title>
-<style>
-body{font-family:Arial;background:#f4f6f9;margin:0;}
-.content{padding:20px;}
-table{width:100%;border-collapse:collapse;background:white;}
-th,td{padding:10px;border:1px solid #ddd;text-align:center;}
-a{padding:5px 10px;text-decoration:none;border-radius:5px;color:white;}
-.approve{background:#27ae60;}
-.reject{background:#e74c3c;}
-</style>
-</head>
-<body>
-
-<div class="content">
 <h2>Pending Reservations</h2>
+<?php echo getFlash(); ?>
 
-<table>
+<input type="text" id="searchInput" placeholder="Search by student or lab" style="padding:10px;margin-bottom:10px;width:50%;">
+<table id="approvalTable" border="1" cellpadding="10" cellspacing="0" style="border-collapse:collapse;width:100%;">
 <tr>
+<th>ID</th>
 <th>Student</th>
 <th>Lab</th>
 <th>Date</th>
-<th>Status</th>
+<th>Time Slot</th>
 <th>Action</th>
 </tr>
-
-<?php
-$sql="SELECT r.*, u.name, l.lab_name 
-      FROM reservations r
-      JOIN users u ON r.user_id=u.id
-      JOIN labs l ON r.lab_id=l.id
-      WHERE r.status='Pending'";
-
-$result=$conn->query($sql);
-
-while($row=$result->fetch_assoc()){
-echo "<tr>
-<td>".e($row['name'])."</td>
-<td>".e($row['lab_name'])."</td>
-<td>".formatDate($row['date'])."</td>
-<td>".statusBadge($row['status'])."</td>
-<td>
-<a class='approve' href='?approve={$row['id']}'>Approve</a>
-<a class='reject' href='?reject={$row['id']}'>Reject</a>
-</td>
-</tr>";
-}
-?>
+<?php while($row = $reservations->fetch_assoc()){ ?>
+<tr>
+    <td><?php echo $row['id']; ?></td>
+    <td><?php echo $row['student_name']; ?></td>
+    <td><?php echo $row['lab_name']; ?></td>
+    <td><?php echo formatDate($row['date']); ?></td>
+    <td><?php echo $row['time_slot']; ?></td>
+    <td>
+        <a href="?approve=<?php echo $row['id']; ?>" class="approveBtn">Approve</a> | 
+        <a href="?reject=<?php echo $row['id']; ?>" class="rejectBtn">Reject</a>
+    </td>
+</tr>
+<?php } ?>
 </table>
 
-</div>
-</body>
-</html>
+<script>
+// Confirm Approve/Reject
+document.querySelectorAll('.approveBtn').forEach(btn => {
+    btn.addEventListener('click', function(e){
+        if(!confirm("Are you sure you want to approve this reservation?")) e.preventDefault();
+    });
+});
+document.querySelectorAll('.rejectBtn').forEach(btn => {
+    btn.addEventListener('click', function(e){
+        if(!confirm("Are you sure you want to reject this reservation?")) e.preventDefault();
+    });
+});
+
+// Table search
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('keyup', function(){
+    const filter = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#approvalTable tr:not(:first-child)');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(filter) ? '' : 'none';
+    });
+});
+</script>
+
+<?php include("../includes/footer.php"); ?>

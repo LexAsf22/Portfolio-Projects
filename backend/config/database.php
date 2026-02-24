@@ -1,14 +1,15 @@
 <?php
 // backend/config/database.php
-// DATABASE CONNECTION ONLY
 
-$servername = "localhost";
-$username = "root";
-$password = ""; // default XAMPP password
-$dbname = "campus_system";
+$host = "localhost";
+$username = "root";      // Change if needed
+$password = "";          // Change if your MySQL has a password
+$dbname = "spacio_db";
 
-$conn = new mysqli($servername, $username, $password, $dbname);
+// Create connection
+$conn = new mysqli($host, $username, $password, $dbname);
 
+// Check connection
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }

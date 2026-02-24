@@ -1,60 +1,45 @@
 <?php
-include("../../backend/config/database.php");
-include("../../backend/config/auth.php");
-include("../../backend/config/helpers.php");
-
-requireRole('student');
 include("../includes/header.php");
+checkRole('student');
 
-$message="";
-
+// Handle submission
 if(isset($_POST['reserve'])){
-    $equipment=$_POST['equipment_id'];
-    $userId=user()['id'];
-    $date=$_POST['date'];
+    $equipment_id = $_POST['equipment'];
+    $date = $_POST['date'];
+    $user_id = $_SESSION['user']['id'];
 
-    $stmt=$conn->prepare("INSERT INTO reservations(user_id,lab_id,date) VALUES(?,?,?)");
-    $stmt->bind_param("iis",$userId,$equipment,$date);
-    $stmt->execute();
-
-    $message=alert("Equipment reservation submitted!","success");
+    // Check availability
+    $check = $conn->query("SELECT * FROM reservations WHERE equipment_id=$equipment_id AND date='$date'");
+    if($check->num_rows > 0){
+        setFlash("Equipment already reserved!", "error");
+    } else {
+        $conn->query("INSERT INTO reservations(user_id, equipment_id, date, status) VALUES($user_id,$equipment_id,'$date','Pending')");
+        setFlash("Equipment reservation submitted!", "success");
+    }
 }
+
+$equipment = $conn->query("SELECT e.*, l.lab_name FROM equipment e JOIN laboratories l ON e.lab_id=l.id");
 ?>
-
-<style>
-form{
-    background:white;
-    padding:20px;
-    border-radius:10px;
-    max-width:400px;
-}
-</style>
 
 <h2>Reserve Equipment</h2>
+<?php echo getFlash(); ?>
 
-<?=$message?>
-
-<form method="POST">
-
-<select name="equipment_id" required>
-<option value="">Select Equipment</option>
-<?php
-$equip=$conn->query("SELECT e.*, l.lab_name 
-                     FROM equipment e
-                     JOIN labs l ON e.lab_id=l.id");
-
-while($row=$equip->fetch_assoc()){
-echo "<option value='{$row['lab_id']}'>
-{$row['name']} ({$row['lab_name']})
-</option>";
-}
-?>
-</select>
-
-<input type="date" name="date" required>
-
-<button name="reserve">Reserve</button>
-
+<form method="POST" id="reserveEqForm">
+    <select name="equipment" required>
+        <option value="">Select Equipment</option>
+        <?php while($e = $equipment->fetch_assoc()){ ?>
+        <option value="<?php echo $e['id']; ?>"><?php echo $e['equipment_name']." (".$e['lab_name'].")"; ?></option>
+        <?php } ?>
+    </select>
+    <input type="date" name="date" required>
+    <button name="reserve" type="submit">Reserve</button>
 </form>
+
+<script>
+// JS confirm
+document.getElementById('reserveEqForm').addEventListener('submit', function(e){
+    if(!confirm("Submit equipment reservation?")) e.preventDefault();
+});
+</script>
 
 <?php include("../includes/footer.php"); ?>

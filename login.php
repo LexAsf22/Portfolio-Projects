@@ -1,55 +1,59 @@
 <?php
-// index.php
+session_start();
 include("backend/config/database.php");
-include("backend/config/auth.php");
+include("backend/config/helpers.php");
 
-// Redirect logged-in users
-if(isLoggedIn()){
-    $role = $_SESSION['role'] ?? '';
-    if($role=="student") {
-        header("Location: frontend/student/dashboard.php");
-        exit;
-    } elseif($role=="teacher") {
-        header("Location: frontend/teacher/dashboard.php");
-        exit;
-    } elseif($role=="admin") {
-        header("Location: frontend/admin/dashboard.php");
-        exit;
+$role = isset($_GET['role']) ? $_GET['role'] : '';
+
+if(isset($_POST['login'])){
+    $email = $_POST['email'];
+    $password = md5($_POST['password']); // demo only
+
+    $sql = "SELECT * FROM users WHERE email='$email' AND password='$password' AND role='$role'";
+    $res = $conn->query($sql);
+
+    if($res->num_rows > 0){
+        $_SESSION['user'] = $res->fetch_assoc();
+        redirect("dashboard.php");
+    } else {
+        $error = "Invalid credentials!";
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Campus Laboratory System</title>
+    <title>Login - <?php echo ucfirst($role); ?></title>
     <style>
-        body { font-family: Arial; background: #f4f6f9; text-align: center; }
-        .container { max-width: 500px; margin: 80px auto; padding: 30px; background: white; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);}
-        h1 { margin-bottom: 20px; }
-        .buttons a {
-            display: block;
-            margin: 10px 0;
-            padding: 12px;
-            background: #3498db;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-        }
-        .buttons a:hover { background: #2980b9; }
+        body {font-family: Arial; background:#ecf0f1;}
+        form {width:300px; margin:100px auto; background:white; padding:20px; border-radius:5px;}
+        input {width:100%; padding:10px; margin:10px 0;}
+        button {width:100%; padding:10px; background:#4caf50; color:white; border:none; cursor:pointer;}
+        button:hover {background:#3e8e41;}
+        .error {color:red; margin-bottom:10px;}
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Welcome to the Campus Laboratory System</h1>
-    <p>Manage lab reservations, equipment, and maintenance efficiently.</p>
+<form id="loginForm" method="POST">
+    <h2><?php echo ucfirst($role); ?> Login</h2>
+    <?php if(isset($error)) echo "<div class='error'>$error</div>"; ?>
+    <input type="email" name="email" placeholder="Email" required>
+    <input type="password" name="password" placeholder="Password" required>
+    <button name="login" type="submit">Login</button>
+</form>
 
-    <div class="buttons">
-        <a href="login.php">Login</a>
-        <a href="register.php">Register</a>
-    </div>
-</div>
+<script>
+// JS: Simple form validation (extra)
+document.getElementById('loginForm').addEventListener('submit', function(e){
+    const email = this.email.value.trim();
+    const pass = this.password.value.trim();
+    if(email=='' || pass==''){
+        alert('Please fill in all fields');
+        e.preventDefault();
+    }
+});
+</script>
 
 </body>
 </html>

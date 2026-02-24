@@ -1,17 +1,9 @@
+<?php
+// frontend/includes/footer.php
+?>
 </div> <!-- end content -->
-
-<footer style="
-    margin-left:220px;
-    text-align:center;
-    padding:15px;
-    background:#ffffff;
-    border-top:1px solid #ddd;
-    font-size:14px;
-    color:#777;
-">
-© <?php echo date("Y"); ?> Campus Laboratory Management System  
-All Rights Reserved
+<footer style="background:#2c5f2e; color:white; text-align:center; padding:10px; position:fixed; bottom:0; width:100%; margin-left:200px;">
+    &copy; 2026 Campus System | All Rights Reserved
 </footer>
-
 </body>
 </html>

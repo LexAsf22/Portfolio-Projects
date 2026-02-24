@@ -1,47 +1,45 @@
 <?php
-include("../../backend/config/database.php");
-include("../../backend/config/auth.php");
-include("../../backend/config/helpers.php");
-
-requireRole('teacher');
 include("../includes/header.php");
-?>
+checkRole('teacher');
 
-<style>
-table{
-    width:100%;
-    background:white;
-    border-collapse:collapse;
-}
-th,td{
-    padding:10px;
-    border-bottom:1px solid #ddd;
-}
-</style>
+// Fetch lab usage
+$usage = $conn->query("SELECT r.*, u.name as student_name, l.lab_name 
+    FROM reservations r 
+    JOIN users u ON r.user_id=u.id 
+    JOIN laboratories l ON r.lab_id=l.id 
+    WHERE r.status='Approved' 
+    ORDER BY r.date DESC LIMIT 50");
+?>
 
 <h2>Lab Usage Monitoring</h2>
 
-<table>
+<input type="text" id="searchLab" placeholder="Search by lab or student..." style="padding:10px;margin:10px 0;width:50%;">
+<table id="usageTable" border="1" cellpadding="10" cellspacing="0" style="border-collapse:collapse;width:100%;">
 <tr>
+<th>Student</th>
 <th>Lab</th>
-<th>Total Reservations</th>
+<th>Date</th>
+<th>Time Slot</th>
 </tr>
-
-<?php
-$sql="SELECT l.lab_name, COUNT(r.id) as total
-      FROM labs l
-      LEFT JOIN reservations r ON l.id=r.lab_id
-      GROUP BY l.id";
-
-$result=$conn->query($sql);
-
-while($row=$result->fetch_assoc()){
-echo "<tr>
-<td>".e($row['lab_name'])."</td>
-<td>".$row['total']."</td>
-</tr>";
-}
-?>
+<?php while($u = $usage->fetch_assoc()){ ?>
+<tr>
+    <td><?php echo $u['student_name']; ?></td>
+    <td><?php echo $u['lab_name']; ?></td>
+    <td><?php echo date("F d, Y", strtotime($u['date'])); ?></td>
+    <td><?php echo $u['time_slot']; ?></td>
+</tr>
+<?php } ?>
 </table>
+
+<script>
+// JS table search
+document.getElementById('searchLab').addEventListener('keyup', function(){
+    const filter = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#usageTable tr:not(:first-child)');
+    rows.forEach(row=>{
+        row.style.display = row.textContent.toLowerCase().includes(filter)? '':'none';
+    });
+});
+</script>
 
 <?php include("../includes/footer.php"); ?>

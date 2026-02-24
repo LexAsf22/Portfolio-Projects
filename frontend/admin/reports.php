@@ -1,44 +1,32 @@
 <?php
-include("../../backend/config/database.php");
-include("../../backend/config/auth.php");
-include("../../backend/config/helpers.php");
-requireRole('admin');
+include("../includes/header.php");
+checkRole('admin');
 
-$totalReservations = $conn->query("SELECT COUNT(*) as total FROM reservations")->fetch_assoc()['total'];
-$totalApproved = $conn->query("SELECT COUNT(*) as total FROM reservations WHERE status='Approved'")->fetch_assoc()['total'];
-$totalIssues = $conn->query("SELECT COUNT(*) as total FROM issues")->fetch_assoc()['total'];
+$total_reservations = $conn->query("SELECT * FROM reservations")->num_rows;
+$approved = $conn->query("SELECT * FROM reservations WHERE status='Approved'")->num_rows;
+$rejected = $conn->query("SELECT * FROM reservations WHERE status='Rejected'")->num_rows;
+$pending = $conn->query("SELECT * FROM reservations WHERE status='Pending'")->num_rows;
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-<title>Reports & Analytics</title>
-<style>
-body{font-family:Arial;background:#f4f6f9;padding:20px;}
-.card{
-background:white;padding:20px;margin:10px 0;
-border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.1);
-}
-</style>
-</head>
-<body>
+<h2>Reports & Analytics</h2>
 
-<h2>System Reports</h2>
+<canvas id="reservationChart" width="400" height="200" style="background:#f9f9f9;margin-top:20px;"></canvas>
 
-<div class="card">
-<h3>Total Reservations</h3>
-<?=$totalReservations;?>
-</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('reservationChart').getContext('2d');
+const myChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['Approved','Rejected','Pending'],
+        datasets: [{
+            label: 'Reservations',
+            data: [<?php echo $approved; ?>, <?php echo $rejected; ?>, <?php echo $pending; ?>],
+            backgroundColor: ['#2ecc71','#e74c3c','#f39c12']
+        }]
+    },
+    options: {responsive:true, scales:{y:{beginAtZero:true}}}
+});
+</script>
 
-<div class="card">
-<h3>Approved Reservations</h3>
-<?=$totalApproved;?>
-</div>
-
-<div class="card">
-<h3>Total Issues Reported</h3>
-<?=$totalIssues;?>
-</div>
-
-</body>
-</html>
+<?php include("../includes/footer.php"); ?>

@@ -1,220 +1,77 @@
 <?php
-// frontend/admin/dashboard.php
-
-include("../../backend/config/database.php");
+// frontend/includes/header.php
 include("../../backend/config/auth.php");
-include("../../backend/config/helpers.php");
+include("../../backend/config/database.php");
+checkLogin(); // ensure the user is logged in
 
-requireRole('admin'); // only admins can access
-
-// Campus filter
-$selectedCampus = $_GET['campus'] ?? 'All';
-
-// Build campus condition (for filtering later if needed)
-$campusCondition = "";
-if ($selectedCampus !== "All") {
-    $campusCondition = " WHERE campus='".$conn->real_escape_string($selectedCampus)."'";
-}
-
-// Statistics
-$totalReservations = $conn->query("SELECT COUNT(*) as total FROM reservations")->fetch_assoc()['total'];
-$pendingReservations = $conn->query("SELECT COUNT(*) as total FROM reservations WHERE status='Pending'")->fetch_assoc()['total'];
-$totalIssues = $conn->query("SELECT COUNT(*) as total FROM issues")->fetch_assoc()['total'];
-$equipmentCount = $conn->query("SELECT COUNT(*) as total FROM equipment")->fetch_assoc()['total'];
-
-include("../includes/header.php"); // contains the sidebar
+$user = $_SESSION['user'];
+$role = $user['role'];
 ?>
 
-<style>
-.dashboard-grid {
-    display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
-    gap:15px;
-    margin-bottom: 20px;
-}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Campus System</title>
+    <style>
+        body {margin:0; font-family:Arial;}
+        .sidebar {
+            width:200px;
+            background:#2c5f2e; /* green school design */
+            color:white;
+            height:100vh;
+            position:fixed;
+            padding:20px 10px;
+        }
+        .sidebar h3 {text-align:center; margin-bottom:30px;}
+        .sidebar a {
+            display:block;
+            color:white;
+            text-decoration:none;
+            padding:10px 5px;
+            margin-bottom:5px;
+            border-radius:5px;
+        }
+        .sidebar a:hover {background:#1e3d1a;}
+        .content {margin-left:220px; padding:20px;}
+        .topbar {
+            background:#4caf50;
+            color:white;
+            padding:15px;
+        }
+    </style>
+</head>
+<body>
 
-.stat-card {
-    background:white;
-    padding:20px;
-    border-radius:10px;
-    box-shadow:0 3px 8px rgba(0,0,0,0.08);
-}
+<div class="sidebar">
+    <h3><?php echo ucfirst($role); ?> Menu</h3>
 
-.stat-card h3 {
-    margin:0;
-    font-size:28px;
-}
+    <a href="../../dashboard.php">Dashboard</a>
 
-.stat-card p {
-    margin:5px 0 0;
-    color:#777;
-}
+    <?php if($role == "student"){ ?>
+        <a href="../student/reserve_lab.php">Reserve Lab</a>
+        <a href="../student/reserve_equipment.php">Reserve Equipment</a>
+        <a href="../student/my_reservations.php">My Reservations</a>
+        <a href="../student/view_computers.php">View Computers</a>
+    <?php } ?>
 
-/* Tabs styling */
-.tabs {
-  margin-bottom: 20px;
-}
+    <?php if($role == "teacher"){ ?>
+        <a href="../teacher/lab_usage.php">Lab Usage</a>
+        <a href="../teacher/report_issue.php">Report Issue</a>
+        <a href="../teacher/issue_status.php">Issue Status</a>
+    <?php } ?>
 
-.tab-btn {
-  background: #eee;
-  border: none;
-  padding: 10px 20px;
-  cursor: pointer;
-  margin-right: 10px;
-  border-radius: 6px 6px 0 0;
-  font-weight: 600;
-  color: #333;
-}
+    <?php if($role == "admin"){ ?>
+        <a href="../admin/approvals.php">Approve Reservations</a>
+        <a href="../admin/inventory.php">Inventory Management</a>
+        <a href="../admin/maintenance.php">Maintenance Requests</a>
+        <a href="../admin/reports.php">Reports & Analytics</a>
+    <?php } ?>
 
-.tab-btn.active {
-  background: white;
-  border-bottom: 2px solid #3498db;
-  color: #3498db;
-}
-
-.tab-content {
-  background: white;
-  padding: 20px;
-  border-radius: 0 6px 6px 6px;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.08);
-}
-
-/* Table styling */
-table {
-    width:100%;
-    border-collapse:collapse;
-}
-
-th, td {
-    padding:10px;
-    border-bottom:1px solid #ddd;
-    text-align:left;
-}
-
-.campus-filter {
-    margin-bottom:20px;
-}
-
-select {
-    padding:6px;
-}
-</style>
-
-<h2>Admin Dashboard</h2>
-
-<!-- Campus Filter -->
-<div class="campus-filter">
-<form method="GET">
-<select name="campus">
-    <option value="All" <?= ($selectedCampus=='All') ? 'selected' : '' ?>>All Campuses</option>
-    <option value="Campus A" <?= ($selectedCampus=='Campus A') ? 'selected' : '' ?>>Campus A</option>
-    <option value="Campus B" <?= ($selectedCampus=='Campus B') ? 'selected' : '' ?>>Campus B</option>
-</select>
-<button type="submit">Filter</button>
-</form>
+    <a href="../../logout.php" style="margin-top:20px; color:#ffdddd;">Logout</a>
 </div>
 
-<!-- Statistics Cards -->
-<div class="dashboard-grid">
-  <div class="stat-card">
-    <h3><?= $totalReservations ?></h3>
-    <p>Total Reservations</p>
-  </div>
-
-  <div class="stat-card">
-    <h3><?= $pendingReservations ?></h3>
-    <p>Pending Approvals</p>
-  </div>
-
-  <div class="stat-card">
-    <h3><?= $totalIssues ?></h3>
-    <p>Maintenance Issues</p>
-  </div>
-
-  <div class="stat-card">
-    <h3><?= $equipmentCount ?></h3>
-    <p>Total Equipment</p>
-  </div>
+<div class="content">
+<div class="topbar">
+    Welcome, <?php echo $user['name']; ?> | Campus: <?php echo $user['campus']; ?>
 </div>
-
-<!-- Tabs -->
-<div class="tabs">
-  <button class="tab-btn active" data-tab="reservations">Recent Reservations</button>
-  <button class="tab-btn" data-tab="issues">Recent Maintenance Issues</button>
-</div>
-
-<!-- Tab contents -->
-<div id="reservations" class="tab-content">
-  <h3>Recent Reservations</h3>
-  <table>
-    <tr>
-      <th>User</th>
-      <th>Lab</th>
-      <th>Date</th>
-      <th>Status</th>
-    </tr>
-
-    <?php
-    $sql = "SELECT r.*, u.name, l.lab_name
-            FROM reservations r
-            JOIN users u ON r.user_id=u.id
-            JOIN labs l ON r.lab_id=l.id
-            ORDER BY r.id DESC LIMIT 5";
-
-    $result = $conn->query($sql);
-
-    while($row = $result->fetch_assoc()){
-      echo "<tr>
-      <td>".e($row['name'])."</td>
-      <td>".e($row['lab_name'])."</td>
-      <td>".formatDate($row['date'])."</td>
-      <td>".statusBadge($row['status'])."</td>
-      </tr>";
-    }
-    ?>
-  </table>
-</div>
-
-<div id="issues" class="tab-content" style="display:none;">
-  <h3>Recent Maintenance Issues</h3>
-  <table>
-    <tr>
-      <th>Campus</th>
-      <th>Room</th>
-      <th>Category</th>
-      <th>Status</th>
-    </tr>
-
-    <?php
-    $sql = "SELECT * FROM issues ORDER BY id DESC LIMIT 5";
-    $result = $conn->query($sql);
-
-    while($row = $result->fetch_assoc()){
-      echo "<tr>
-      <td>".e($row['campus'])."</td>
-      <td>".e($row['room'])."</td>
-      <td>".e($row['category'])."</td>
-      <td>".statusBadge($row['status'])."</td>
-      </tr>";
-    }
-    ?>
-  </table>
-</div>
-
-<!-- Tabs JS -->
-<script>
-const tabs = document.querySelectorAll('.tab-btn');
-const contents = document.querySelectorAll('.tab-content');
-
-tabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    tabs.forEach(t => t.classList.remove('active'));
-    contents.forEach(c => c.style.display = 'none');
-
-    tab.classList.add('active');
-    document.getElementById(tab.dataset.tab).style.display = 'block';
-  });
-});
-</script>
-
-<?php include("../includes/footer.php"); ?>

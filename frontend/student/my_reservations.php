@@ -1,53 +1,45 @@
 <?php
-include("../../backend/config/database.php");
-include("../../backend/config/auth.php");
-include("../../backend/config/helpers.php");
-
-requireRole('student');
-
-$user = user();
-$userId = $user['id'] ?? 0;
-
 include("../includes/header.php");
+checkRole('student');
+
+$reservations = $conn->query("SELECT r.*, l.lab_name, e.equipment_name 
+    FROM reservations r 
+    LEFT JOIN laboratories l ON r.lab_id=l.id 
+    LEFT JOIN equipment e ON r.equipment_id=e.id 
+    WHERE r.user_id=".$_SESSION['user']['id']." ORDER BY r.date DESC");
 ?>
 
 <h2>My Reservations</h2>
 
-<table style="width:100%; border-collapse: collapse;">
-    <thead>
-        <tr>
-            <th>Lab</th>
-            <th>Date</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php
-        $stmt = $conn->prepare("
-            SELECT l.lab_name AS lab_name, r.date AS reservation_date, r.status
-            FROM reservations r
-            JOIN labs l ON r.lab_id = l.id
-            WHERE r.user_id = ?
-            ORDER BY r.date DESC
-        ");
-        $stmt->bind_param("i", $userId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if ($result->num_rows === 0) {
-            echo "<tr><td colspan='3' style='text-align:center;'>No reservations found.</td></tr>";
-        } else {
-            while ($row = $result->fetch_assoc()) {
-                echo "<tr>";
-                echo "<td>" . e($row['lab_name']) . "</td>";
-                echo "<td>" . e($row['reservation_date']) . "</td>";
-                echo "<td>" . statusBadge($row['status']) . "</td>";
-                echo "</tr>";
-            }
-        }
-        $stmt->close();
-        ?>
-    </tbody>
+<input type="text" id="searchRes" placeholder="Search..." style="padding:10px;margin:10px 0;width:50%;">
+<table id="myResTable" border="1" cellpadding="10" cellspacing="0" style="border-collapse:collapse;width:100%;">
+<tr>
+<th>Type</th>
+<th>Name</th>
+<th>Date</th>
+<th>Time Slot</th>
+<th>Status</th>
+</tr>
+<?php while($r = $reservations->fetch_assoc()){ ?>
+<tr>
+    <td><?php echo $r['lab_id']? "Lab":"Equipment"; ?></td>
+    <td><?php echo $r['lab_id']? $r['lab_name'] : $r['equipment_name']; ?></td>
+    <td><?php echo date("F d, Y", strtotime($r['date'])); ?></td>
+    <td><?php echo $r['time_slot'] ?? "-"; ?></td>
+    <td><?php echo $r['status']; ?></td>
+</tr>
+<?php } ?>
 </table>
+
+<script>
+// JS search
+document.getElementById('searchRes').addEventListener('keyup', function(){
+    const filter = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#myResTable tr:not(:first-child)');
+    rows.forEach(row=>{
+        row.style.display = row.textContent.toLowerCase().includes(filter)? '':'none';
+    });
+});
+</script>
 
 <?php include("../includes/footer.php"); ?>

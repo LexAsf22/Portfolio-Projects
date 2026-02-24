@@ -1,50 +1,45 @@
 <?php
-include("../../backend/config/database.php");
-include("../../backend/config/auth.php");
-include("../../backend/config/helpers.php");
-
-requireRole('teacher');
 include("../includes/header.php");
+checkRole('teacher');
 
-$userId=user()['id'];
+$issues = $conn->query("SELECT * FROM issues WHERE user_id=".$_SESSION['user']['id']." ORDER BY created_at DESC");
 ?>
 
-<style>
-table{
-    width:100%;
-    background:white;
-    border-collapse:collapse;
-}
-th,td{
-    padding:10px;
-    border-bottom:1px solid #ddd;
-}
-</style>
+<h2>My Reported Issues</h2>
 
-<h2>My Issue Status</h2>
-
-<table>
+<input type="text" id="searchIssues" placeholder="Search issues..." style="padding:10px;margin:10px 0;width:50%;">
+<table id="issueTable" border="1" cellpadding="10" cellspacing="0" style="border-collapse:collapse;width:100%;">
 <tr>
+<th>ID</th>
 <th>Campus</th>
 <th>Room</th>
 <th>Category</th>
 <th>Priority</th>
 <th>Status</th>
+<th>Reported At</th>
 </tr>
-
-<?php
-$result=$conn->query("SELECT * FROM issues WHERE user_id='$userId' ORDER BY id DESC");
-
-while($row=$result->fetch_assoc()){
-echo "<tr>
-<td>".e($row['campus'])."</td>
-<td>".e($row['room'])."</td>
-<td>".e($row['category'])."</td>
-<td>".e($row['priority'])."</td>
-<td>".statusBadge($row['status'])."</td>
-</tr>";
-}
-?>
+<?php while($i = $issues->fetch_assoc()){ ?>
+<tr>
+    <td><?php echo $i['id']; ?></td>
+    <td><?php echo $i['campus']; ?></td>
+    <td><?php echo $i['room']; ?></td>
+    <td><?php echo $i['category']; ?></td>
+    <td><?php echo $i['priority']; ?></td>
+    <td><?php echo $i['status']; ?></td>
+    <td><?php echo date("F d, Y H:i", strtotime($i['created_at'])); ?></td>
+</tr>
+<?php } ?>
 </table>
+
+<script>
+// JS search/filter
+document.getElementById('searchIssues').addEventListener('keyup', function(){
+    const filter = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#issueTable tr:not(:first-child)');
+    rows.forEach(row=>{
+        row.style.display = row.textContent.toLowerCase().includes(filter)? '':'none';
+    });
+});
+</script>
 
 <?php include("../includes/footer.php"); ?>

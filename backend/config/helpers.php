@@ -1,45 +1,34 @@
 <?php
 // backend/config/helpers.php
 
-// Escape output safely
-if (!function_exists('e')) {
-    function e($string) {
-        return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
-    }
+// Format date
+function formatDate($date) {
+    return date("F d, Y", strtotime($date));
 }
 
-// Example: other helper functions can go below
-function statusBadge($status) {
-    $colors = [
-        "Pending" => "orange",
-        "Approved" => "green",
-        "Rejected" => "red"
-    ];
-    $color = $colors[$status] ?? "gray";
-    return "<span style='color:$color; font-weight:bold;'>$status</span>";
+// Flash messages (store in session)
+function setFlash($message, $type="success") {
+    $_SESSION['flash'] = ['message'=>$message, 'type'=>$type];
 }
 
-function countReservations($conn, $userId, $status=null){
-    if (!$userId) return 0; // Early return if no user ID
-
-    $sql = "SELECT COUNT(*) as total FROM reservations WHERE user_id = ?";
-    if ($status) {
-        $sql .= " AND status = ?";
+function getFlash() {
+    if(isset($_SESSION['flash'])) {
+        $flash = $_SESSION['flash'];
+        unset($_SESSION['flash']);
+        return "<div class='{$flash['type']}'>{$flash['message']}</div>";
     }
-
-    if ($status) {
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("is", $userId, $status);
-    } else {
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $userId);
-    }
-    $stmt->execute();
-    $res = $stmt->get_result();
-    $count = 0;
-    if ($row = $res->fetch_assoc()) {
-        $count = $row['total'];
-    }
-    $stmt->close();
-    return $count;
+    return "";
 }
+
+// Get user by ID
+function getUser($conn, $id) {
+    $res = $conn->query("SELECT * FROM users WHERE id=$id");
+    return $res->fetch_assoc();
+}
+
+// Redirect helper
+function redirect($url) {
+    header("Location: $url");
+    exit;
+}
+?>
