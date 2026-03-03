@@ -1,9 +1,8 @@
 <?php
 // backend/config/database.php
-
 $host = "localhost";
-$username = "root";      // Change if needed
-$password = "";          // Change if your MySQL has a password
+$username = "root";
+$password = "";
 $dbname = "spacio_db";
 
 // Create connection
