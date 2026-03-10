@@ -218,8 +218,6 @@ class="<?= isset($errorFields['role']) ? 'invalid' : '' ?>">
 
 <option value="teacher" <?= $old['role']==='teacher'?'selected':'' ?>>Teacher</option>
 
-<option value="admin" <?= $old['role']==='admin'?'selected':'' ?>>Admin</option>
-
 </select>
 
 <div class="field-hint"><?= $errorFields['role'] ?? '' ?></div>
