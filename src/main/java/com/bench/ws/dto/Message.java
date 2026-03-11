@@ -1,17 +1,27 @@
 package com.bench.ws.dto;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "messages")
 public class Message {
+
+    public enum Status { SENT, DELIVERED, SEEN }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,8 +39,15 @@ public class Message {
 
     private LocalDateTime timestamp;
 
-    // For call history
-    private Integer callDuration; // seconds, null if not a call
+    private Integer callDuration;
+
+    @Enumerated(EnumType.STRING)
+    private Status status = Status.SENT;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "message_seen_by", joinColumns = @JoinColumn(name = "message_id"))
+    @Column(name = "username")
+    private List<String> seenBy = new ArrayList<>();
 
     public Message() {}
 
@@ -40,6 +57,7 @@ public class Message {
         this.type      = type;
         this.fileUrl   = fileUrl;
         this.timestamp = LocalDateTime.now();
+        this.status    = Status.SENT;
     }
 
     public Long getId()                          { return id; }
@@ -55,4 +73,8 @@ public class Message {
     public void setTimestamp(LocalDateTime t)    { this.timestamp = t; }
     public Integer getCallDuration()             { return callDuration; }
     public void setCallDuration(Integer d)       { this.callDuration = d; }
+    public Status getStatus()                    { return status; }
+    public void setStatus(Status s)              { this.status = s; }
+    public List<String> getSeenBy()              { return seenBy; }
+    public void setSeenBy(List<String> s)        { this.seenBy = s; }
 }

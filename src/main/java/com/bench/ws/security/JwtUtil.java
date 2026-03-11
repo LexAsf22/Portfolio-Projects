@@ -25,9 +25,7 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    // Generate token
     public String generateToken(String username) {
-
         return Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date())
@@ -36,9 +34,7 @@ public class JwtUtil {
                 .compact();
     }
 
-    // Extract username
     public String extractUsername(String token) {
-
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
@@ -47,17 +43,13 @@ public class JwtUtil {
                 .getSubject();
     }
 
-    // Validate token
     public boolean validateToken(String token) {
-
         try {
             Jwts.parserBuilder()
                     .setSigningKey(getSigningKey())
                     .build()
                     .parseClaimsJws(token);
-
             return true;
-
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }

@@ -1,22 +1,18 @@
 package com.bench.ws.websocket;
 
-import com.bench.ws.security.JwtUtil;
+import java.util.List;
 
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageDeliveryException;
-
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
-
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
-
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import com.bench.ws.security.JwtUtil;
 
 @Component
 public class JwtChannelInterceptor implements ChannelInterceptor {
@@ -33,7 +29,6 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
         StompHeaderAccessor accessor =
                 MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        // Validate only during CONNECT
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
 
             String authHeader = accessor.getFirstNativeHeader("Authorization");
@@ -50,13 +45,8 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
 
             String username = jwtUtil.extractUsername(token);
 
-            // set authenticated user for the WebSocket session
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            username,
-                            null,
-                            List.of()
-                    );
+                    new UsernamePasswordAuthenticationToken(username, null, List.of());
 
             accessor.setUser(authentication);
         }

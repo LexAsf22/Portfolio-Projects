@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bench.ws.dto.LoginRequest;
@@ -99,5 +100,24 @@ public class AuthController {
         return ResponseEntity.ok(
                 messageRepository.findAllByOrderByTimestampAsc()
         );
+    }
+
+    // ── SEARCH MESSAGES ────────────────────────────────────────
+    @GetMapping("/search")
+    public ResponseEntity<List<Message>> searchMessages(
+            @RequestParam String q) {
+        return ResponseEntity.ok(
+            messageRepository
+                .findByContentContainingIgnoreCaseOrderByTimestampAsc(q));
+    }
+
+    // ── LIST ALL USERS ─────────────────────────────────────────
+    @GetMapping("/users")
+    public ResponseEntity<List<String>> getAllUsers() {
+        return ResponseEntity.ok(
+            userRepository.findAll()
+                .stream()
+                .map(u -> u.getUsername())
+                .collect(java.util.stream.Collectors.toList()));
     }
 }

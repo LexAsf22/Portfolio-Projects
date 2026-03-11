@@ -30,18 +30,15 @@ public class SecurityConfig {
 
         http
             .csrf(csrf -> csrf.disable())
-
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
             .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/auth/**").permitAll()
-            .requestMatchers("/ws/**").permitAll()
-            .requestMatchers("/upload/**").permitAll()
-            .requestMatchers("/uploads/**").permitAll()
-            .anyRequest().authenticated()
-)
-
+                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/ws/**").permitAll()
+                .requestMatchers("/upload/**").permitAll()
+                .requestMatchers("/uploads/**").permitAll()
+                .anyRequest().authenticated()
+            )
             .addFilterBefore(jwtAuthFilter,
                     UsernamePasswordAuthenticationFilter.class);
 
@@ -51,13 +48,11 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration config) throws Exception {
-
         return config.getAuthenticationManager();
     }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-
         return new BCryptPasswordEncoder();
     }
 }

@@ -632,7 +632,7 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
     if (remoteRef.current && remoteStreamRef.current) {
       if (remoteRef.current.srcObject !== remoteStreamRef.current) {
         remoteRef.current.srcObject = remoteStreamRef.current;
-        remoteRef.current.play().catch(() => {});
+        remoteRef.current.play().catch(() => { });
       }
     }
   }, [status]); // status changes when connected, triggering re-attach
@@ -661,9 +661,9 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
         const stream = await navigator.mediaDevices.getUserMedia(
           mode === "video"
             ? {
-                audio: true,
-                video: { width: 1280, height: 720, facingMode: "user" },
-              }
+              audio: true,
+              video: { width: 1280, height: 720, facingMode: "user" },
+            }
             : { audio: true, video: false },
         );
         localStream.current = stream;
@@ -672,7 +672,7 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
           const attachLocal = () => {
             if (localRef.current) {
               localRef.current.srcObject = stream;
-              localRef.current.play().catch(() => {});
+              localRef.current.play().catch(() => { });
             } else {
               setTimeout(attachLocal, 100);
             }
@@ -705,7 +705,7 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
             const tryAttach = () => {
               if (remoteRef.current) {
                 remoteRef.current.srcObject = remoteStream;
-                remoteRef.current.play().catch(() => {});
+                remoteRef.current.play().catch(() => { });
               } else {
                 setTimeout(tryAttach, 100);
               }
@@ -716,7 +716,7 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
             const audio = new Audio();
             audio.srcObject = remoteStream;
             audio.autoplay = true;
-            audio.play().catch(() => {});
+            audio.play().catch(() => { });
           }
           callStarted = true;
           setStatus("Connected");
@@ -823,7 +823,7 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
           for (const c of pendingCandidates) {
             try {
               await pc.addIceCandidate(new RTCIceCandidate(c));
-            } catch (_) {}
+            } catch (_) { }
           }
           pendingCandidates = [];
         };
@@ -926,7 +926,7 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
                 if (remoteDescSet) {
                   try {
                     await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                  } catch (_) {}
+                  } catch (_) { }
                 } else {
                   pendingCandidates.push(candidate);
                 }
@@ -1344,6 +1344,69 @@ function IncomingCallBanner({ from, mode, onAccept, onReject }) {
 /* ─────────────────────────────────────────────────────────
    CSS  — no reliance on color inheritance for icons
 ───────────────────────────────────────────────────────── */
+
+const EMOJIS = [
+  "😀", "😂", "😍", "😎", "😭", "😅", "🤔", "😤", "🥰", "😇",
+  "🤣", "😊", "😋", "😜", "🤩", "🥳", "😏", "😒", "😔", "😳",
+  "👍", "👎", "👏", "🙌", "🤝", "🙏", "👋", "💪", "🤜", "✌️",
+  "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "💔", "💕", "💯",
+  "🔥", "⭐", "✨", "🎉", "🎊", "🎁", "🏆", "🎯", "💡", "🚀",
+  "😈", "👻", "💀", "🤖", "👽", "🐶", "🐱", "🐭", "🦊", "🐻",
+  "🍕", "🍔", "🍟", "🌮", "🍜", "🍣", "🍩", "🍪", "☕", "🧋",
+  "⚽", "🏀", "🎮", "🎵", "🎬", "📸", "💻", "📱", "🌈", "🌙",
+];
+
+function EmojiPicker({ onSelect, emojiRef }) {
+  return (
+    <div ref={emojiRef} style={{
+      position: "absolute",
+      bottom: 70,
+      right: 20,
+      zIndex: 50,
+      width: 300,
+      maxHeight: 220,
+      overflowY: "auto",
+      background: "var(--glass2)",
+      border: "1px solid var(--glass-border)",
+      borderRadius: 16,
+      padding: 10,
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 2,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
+      backdropFilter: "blur(20px)",
+    }}>
+      {EMOJIS.map((e, i) => (
+        <button key={i} onClick={() => onSelect(e)} style={{
+          width: 36, height: 36, border: "none", borderRadius: 8,
+          background: "transparent", cursor: "pointer", fontSize: 20,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "background 0.1s",
+        }}
+          onMouseEnter={ev => ev.currentTarget.style.background = "var(--accent-soft)"}
+          onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
+        >
+          {e}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function IcoSmile({ size = 20, color = "#8b6fd4" }) {
+  const s = svgBase(size);
+  return (
+    <svg viewBox="0 0 24 24" style={s} fill="none">
+      <circle cx="12" cy="12" r="10"
+        style={{ stroke: color, strokeWidth: 1.9, fill: "none" }} />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2"
+        style={{ stroke: color, strokeWidth: 1.9, strokeLinecap: "round", fill: "none" }} />
+      <circle cx="9" cy="10" r="0.8" style={{ fill: color }} />
+      <circle cx="15" cy="10" r="0.8" style={{ fill: color }} />
+    </svg>
+  );
+}
+
 const buildCSS = (dark) => `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
@@ -1485,8 +1548,7 @@ const buildCSS = (dark) => `
   .c-time  { font-size:10px; color:var(--text-muted); font-family:'Fira Code',monospace; }
 
   /* ── CHAT PANEL ── */
-  .chat-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
-
+  .chat-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; position:relative; }
   .chat-hdr {
     display:flex; align-items:center; gap:12px; padding:13px 20px;
     background:var(--glass2); backdrop-filter:blur(20px);
@@ -1624,6 +1686,12 @@ export default function Chat({ authUser, authToken, onLogout }) {
   const [isCaller, setIsCaller] = useState(false);
   const [incomingCall, setIncoming] = useState(null);
   const [callKey, setCallKey] = useState(0);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [typingUsers, setTypingUsers] = useState([]);
+  const typingTimeout = useRef(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const emojiRef = useRef(null);
 
   const stompClient = useRef(null);
   const messagesEnd = useRef(null);
@@ -1649,7 +1717,7 @@ export default function Chat({ authUser, authToken, onLogout }) {
   /* ── CONNECT ── */
   const connect = () => {
     const client = new Client({
-      webSocketFactory: () => new SockJS("http://192.168.108.252:8080/ws"),
+      webSocketFactory: () => new SockJS("http://192.168.100.127:8080/ws"),
       reconnectDelay: 5000,
       connectHeaders: {
         // ← ADD THIS
@@ -1658,7 +1726,7 @@ export default function Chat({ authUser, authToken, onLogout }) {
       onConnect: async () => {
         // Load message history
         try {
-          const res = await fetch("http://192.168.108.252:8080/auth/history", {
+          const res = await fetch("http://192.168.100.127:8080/auth/history", {
             headers: { Authorization: `Bearer ${authToken}` },
           });
           const history = await res.json();
@@ -1667,9 +1735,9 @@ export default function Chat({ authUser, authToken, onLogout }) {
               ...m,
               time: m.timestamp
                 ? new Date(m.timestamp).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
                 : getTime(),
             })),
           );
@@ -1687,6 +1755,30 @@ export default function Chat({ authUser, authToken, onLogout }) {
             setIncoming({ from: sig.sender, mode: sig.mode });
           }
         });
+
+        client.subscribe("/topic/presence", (res) => {
+          const event = JSON.parse(res.body);
+          setOnlineUsers(Array.from(event.onlineUsers || []));
+        });
+
+        client.subscribe("/topic/typing", (res) => {
+          const event = JSON.parse(res.body);
+          if (event.sender === nameRef.current) return;
+          if (event.typing) {
+            setTypingUsers(prev =>
+              prev.includes(event.sender) ? prev : [...prev, event.sender]
+            );
+          } else {
+            setTypingUsers(prev => prev.filter(u => u !== event.sender));
+          }
+        });
+
+        client.subscribe("/topic/seen", (res) => {
+          const update = JSON.parse(res.body);
+          setMessages(prev => prev.map(m =>
+            m.id === update.messageId ? { ...m, status: "SEEN" } : m
+          ));
+        });
       },
       onStompError: (f) => console.error("STOMP:", f.headers["message"]),
     });
@@ -1694,8 +1786,14 @@ export default function Chat({ authUser, authToken, onLogout }) {
     stompClient.current = client;
   };
 
-  /* ── SEND TEXT ── */
   const sendMessage = () => {
+    clearTimeout(typingTimeout.current);
+    if (stompClient.current?.connected) {
+      stompClient.current.publish({
+        destination: "/app/typing",
+        body: JSON.stringify({ sender: nameRef.current, typing: false }),
+      });
+    }
     if (stompClient.current?.connected && message.trim()) {
       stompClient.current.publish({
         destination: "/app/send",
@@ -1709,7 +1807,7 @@ export default function Chat({ authUser, authToken, onLogout }) {
   };
 
   /* ── UPLOAD ── */
-  const BASE_URL = "http://192.168.108.252:8080";
+  const BASE_URL = "http://192.168.100.127:8080";
 
   const uploadFile = async (file, type) => {
     try {
@@ -1864,10 +1962,55 @@ export default function Chat({ authUser, authToken, onLogout }) {
       sendMessage();
     }
   };
-  const handleInput = (e) => {
+  const handleInput = e => {
     setMessage(e.target.value);
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 110) + "px";
+
+    if (stompClient.current?.connected) {
+      stompClient.current.publish({
+        destination: "/app/typing",
+        body: JSON.stringify({ sender: nameRef.current, typing: true }),
+      });
+    }
+
+    // Clear typing after 2 seconds of no input
+    clearTimeout(typingTimeout.current);
+    typingTimeout.current = setTimeout(() => {
+      if (stompClient.current?.connected) {
+        stompClient.current.publish({
+          destination: "/app/typing",
+          body: JSON.stringify({ sender: nameRef.current, typing: false }),
+        });
+      }
+    }, 2000);
+  };
+
+  const insertEmoji = (emoji) => {
+    setMessage(prev => prev + emoji);
+    inputRef.current?.focus();
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOver(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.type.startsWith("image/")) uploadFile(file, "IMAGE");
+    else if (file.type.startsWith("video/")) uploadFile(file, "VIDEO");
+    else if (file.type.startsWith("audio/")) uploadFile(file, "AUDIO");
+    else uploadFile(file, "FILE");
   };
 
   /* ── RENDER MESSAGE ── */
@@ -1895,9 +2038,9 @@ export default function Chat({ authUser, authToken, onLogout }) {
       // Strip any embedded host and re-prefix with current server
       if (url.startsWith("http")) {
         const path = url.replace(/^https?:\/\/[^/]+/, "");
-        return `http://192.168.108.252:8080${path}`;
+        return `http://192.168.100.127:8080${path}`;
       }
-      return `http://192.168.108.252:8080${url.startsWith("/") ? "" : "/"}${url}`;
+      return `http://192.168.100.127:8080${url.startsWith("/") ? "" : "/"}${url}`;
     };
 
     if (msg.type === "IMAGE") {
@@ -1957,8 +2100,33 @@ export default function Chat({ authUser, authToken, onLogout }) {
         : lastMsg.type === "VIDEO"
           ? "🎬 Video"
           : lastMsg.type === "FILE"
-          ? "📎 File"
-          : lastMsg.content;
+            ? "📎 File"
+            : lastMsg.content;
+
+  useEffect(() => {
+    if (!messages.length || !stompClient.current?.connected) return;
+
+    // Mark all messages from others as seen when they appear
+    messages.forEach(msg => {
+      if (msg.sender !== name && msg.id && msg.status !== "SEEN") {
+        stompClient.current.publish({
+          destination: "/app/seen",
+          body: JSON.stringify({ messageId: msg.id, username: name }),
+        });
+      }
+    });
+  }, [messages]); // eslint-disable-line
+
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target)) {
+        setShowEmoji(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   /* ── THEME TOGGLE ── */
   const ThemeToggle = () => (
@@ -2041,25 +2209,59 @@ export default function Chat({ authUser, authToken, onLogout }) {
                 <input placeholder="Search" />
               </div>
             </div>
-            <div className="sb-section">Messages</div>
+            <div className="sb-section">
+              Online — {onlineUsers.length}
+            </div>
             <div className="contact-list">
-              <div className="contact-item active">
-                <div className="c-av story">
-                  C<div className="c-online" />
+              {onlineUsers.length === 0 ? (
+                <div style={{ padding: "12px 10px", fontSize: 12, color: "var(--text-muted)" }}>
+                  No users online
                 </div>
-                <div className="c-info">
-                  <div className="c-name">Channel 1</div>
-                  <div className="c-last">{lastPreview}</div>
+              ) : onlineUsers.map((user, i) => (
+                <div key={i} className={`contact-item ${user === name ? "active" : ""}`}>
+                  <div className="c-av">
+                    {user[0].toUpperCase()}
+                    <div className="c-online" />
+                  </div>
+                  <div className="c-info">
+                    <div className="c-name">{user} {user === name ? "(you)" : ""}</div>
+                    <div className="c-last">
+                      {typingUsers.includes(user) ? "✍️ typing..." : "Online"}
+                    </div>
+                  </div>
                 </div>
-                <div className="c-meta">
-                  <div className="c-time">now</div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
           {/* ── CHAT PANEL ── */}
-          <div className="chat-panel">
+          <div
+            className="chat-panel"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {dragOver && (
+              <div style={{
+                position: "absolute", inset: 0, zIndex: 20,
+                background: "rgba(196,109,255,0.13)",
+                border: "2.5px dashed var(--accent)",
+                borderRadius: 18,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                pointerEvents: "none",
+              }}>
+                <div style={{
+                  background: "var(--glass2)", borderRadius: 16,
+                  padding: "22px 36px", textAlign: "center",
+                  border: "1px solid var(--glass-border)",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+                }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>📎</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "var(--accent)" }}>Drop to send</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>Image, video, audio, or file</div>
+                </div>
+              </div>
+            )}
             {/* Header */}
             <div className="chat-hdr">
               <div className="h-av">C</div>
@@ -2117,16 +2319,53 @@ export default function Chat({ authUser, authToken, onLogout }) {
                           {renderContent(msg)}
                         </div>
                       </div>
-                      <div className="msg-time">{msg.time}</div>
+                      <div className="msg-time">
+                        {msg.time}
+                        {msg.sender === name && (
+                          <span style={{ marginLeft: 5, fontSize: 11 }}>
+                            {msg.status === "SEEN"
+                              ? <span style={{ color: "#60a5fa" }}>✓✓</span>
+                              : msg.status === "DELIVERED"
+                                ? <span style={{ color: "var(--text-muted)" }}>✓✓</span>
+                                : <span style={{ color: "var(--text-muted)" }}>✓</span>}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })
+              )}
+
+              {typingUsers.length > 0 && (
+                <div className="msg-group other" style={{ marginBottom: 4 }}>
+                  <div className="msg-row">
+                    <div className="mini-av">{typingUsers[0][0].toUpperCase()}</div>
+                    <div className="msg-bubble" style={{
+                      padding: "10px 16px",
+                      display: "flex", alignItems: "center", gap: 5,
+                    }}>
+                      <span style={{ fontSize: 12, color: "var(--text-sub)" }}>
+                        {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing
+                      </span>
+                      <span style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                        {[0, 1, 2].map(i => (
+                          <span key={i} style={{
+                            width: 5, height: 5, borderRadius: "50%",
+                            background: "var(--text-muted)",
+                            display: "inline-block",
+                            animation: `blink 1.2s infinite ${i * 0.2}s`,
+                          }} />
+                        ))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               )}
               <div ref={messagesEnd} />
             </div>
 
             {/* Input */}
-            <div className="input-area">
+            <div className="input-area" style={{ position: "relative" }}>
               <div className="input-row">
                 <textarea
                   ref={inputRef}
@@ -2171,6 +2410,13 @@ export default function Chat({ authUser, authToken, onLogout }) {
                     )}
                   </button>
                   <button
+                    className="ico-btn"
+                    title="Emoji"
+                    onClick={(e) => { e.stopPropagation(); setShowEmoji(v => !v); }}
+                  >
+                    <IcoSmile color={IC} size={20} />
+                  </button>
+                  <button
                     className="send-btn"
                     title="Send"
                     onClick={sendMessage}
@@ -2185,10 +2431,12 @@ export default function Chat({ authUser, authToken, onLogout }) {
                   to stop
                 </div>
               )}
+              {showEmoji && (
+                <EmojiPicker onSelect={insertEmoji} emojiRef={emojiRef} />
+              )}
             </div>
           </div>
-
-          <input
+        <input
             type="file"
             accept="image/*"
             ref={imageInputRef}

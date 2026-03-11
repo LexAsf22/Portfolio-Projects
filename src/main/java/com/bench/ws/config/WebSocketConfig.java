@@ -9,11 +9,9 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 import com.bench.ws.websocket.JwtChannelInterceptor;
 
-
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-
 
     private final JwtChannelInterceptor jwtChannelInterceptor;
 
@@ -24,10 +22,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-        .setAllowedOriginPatterns("*") // OK for LAN
-        .withSockJS();
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
     }
-
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -35,9 +32,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.setApplicationDestinationPrefixes("/app");
     }
 
-      @Override
+    @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        // Register the JWT interceptor — runs before every @MessageMapping method
         registration.interceptors(jwtChannelInterceptor);
     }
 }
