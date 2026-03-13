@@ -77,4 +77,12 @@ public class Message {
     public void setStatus(Status s)              { this.status = s; }
     public List<String> getSeenBy()              { return seenBy; }
     public void setSeenBy(List<String> s)        { this.seenBy = s; }
+
+    private boolean edited = false;
+    private boolean deleted = false;
+
+    public boolean isEdited()        { return edited; }
+    public void setEdited(boolean e) { this.edited = e; }
+    public boolean isDeleted()       { return deleted; }
+    public void setDeleted(boolean d){ this.deleted = d; }
 }

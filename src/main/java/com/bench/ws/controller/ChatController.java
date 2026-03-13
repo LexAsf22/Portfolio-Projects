@@ -2,31 +2,29 @@ package com.bench.ws.controller;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
-
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
-
-import com.bench.ws.dto.CallSignal;
-import com.bench.ws.dto.Message;
-import com.bench.ws.dto.MessageStatusUpdate;
-import com.bench.ws.dto.TypingEvent;
-import com.bench.ws.repository.MessageRepository;
+import org.springframework.transaction.annotation.Transactional;
+import com.bench.ws.dto.*;
+import com.bench.ws.repository.*;
 
 @Controller
 public class ChatController {
 
-    private final MessageRepository messageRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final MessageRepository         messageRepository;
+    private final MessageReactionRepository reactionRepository;
+    private final SimpMessagingTemplate     messagingTemplate;
 
     public ChatController(MessageRepository messageRepository,
+                          MessageReactionRepository reactionRepository,
                           SimpMessagingTemplate messagingTemplate) {
-        this.messageRepository = messageRepository;
-        this.messagingTemplate = messagingTemplate;
+        this.messageRepository  = messageRepository;
+        this.reactionRepository = reactionRepository;
+        this.messagingTemplate  = messagingTemplate;
     }
 
-    // ── Chat messages ──────────────────────────────────────────
     @MessageMapping("/send")
     @SendTo("/topic/channel1")
     public Message handleSendMessage(Message message) {
@@ -36,7 +34,6 @@ public class ChatController {
         return message;
     }
 
-    // ── Call ended ─────────────────────────────────────────────
     @MessageMapping("/call-ended")
     @SendTo("/topic/call-ended")
     public Message handleCallEnded(Message message) {
@@ -45,28 +42,18 @@ public class ChatController {
         return message;
     }
 
-    // ── WebRTC signalling ──────────────────────────────────────
     @MessageMapping("/call-signal")
     @SendTo("/topic/call-signal")
-    public CallSignal handleCallSignal(CallSignal signal) {
-        return signal;
-    }
+    public CallSignal handleCallSignal(CallSignal signal) { return signal; }
 
-    // ── Call ring / reject ─────────────────────────────────────
     @MessageMapping("/call-notify")
     @SendTo("/topic/call-notify")
-    public CallSignal handleCallNotify(CallSignal signal) {
-        return signal;
-    }
+    public CallSignal handleCallNotify(CallSignal signal) { return signal; }
 
-    // ── Typing indicator ───────────────────────────────────────
     @MessageMapping("/typing")
     @SendTo("/topic/typing")
-    public TypingEvent handleTyping(TypingEvent event) {
-        return event;
-    }
+    public TypingEvent handleTyping(TypingEvent event) { return event; }
 
-    // ── Mark message as seen ───────────────────────────────────
     @MessageMapping("/seen")
     public void handleSeen(MessageStatusUpdate update) {
         Optional<Message> opt = messageRepository.findById(update.getMessageId());
@@ -78,6 +65,56 @@ public class ChatController {
                 messageRepository.save(msg);
             }
             messagingTemplate.convertAndSend("/topic/seen", update);
+        }
+    }
+
+    // ── React to a message ─────────────────────────────────────
+    @MessageMapping("/react")
+    @Transactional
+    public void handleReact(ReactionEvent event) {
+        Optional<MessageReaction> existing = reactionRepository
+            .findByMessageIdAndUsernameAndEmoji(
+                event.getMessageId(), event.getUsername(), event.getEmoji());
+
+        if (existing.isPresent()) {
+            reactionRepository.deleteByMessageIdAndUsernameAndEmoji(
+                event.getMessageId(), event.getUsername(), event.getEmoji());
+            event.setAction("REMOVE");
+        } else {
+            reactionRepository.save(
+                new MessageReaction(event.getMessageId(), event.getUsername(), event.getEmoji()));
+            event.setAction("ADD");
+        }
+
+        event.setReactions(reactionRepository.findByMessageId(event.getMessageId()));
+        messagingTemplate.convertAndSend("/topic/reaction", event);
+    }
+
+    // ── Edit a message ─────────────────────────────────────────
+    @MessageMapping("/edit")
+    public void handleEdit(MessageEditEvent event) {
+        Optional<Message> opt = messageRepository.findById(event.getMessageId());
+        if (opt.isPresent()) {
+            Message msg = opt.get();
+            if (!msg.getSender().equals(event.getEditor())) return; // only owner
+            msg.setContent(event.getNewContent());
+            msg.setEdited(true);
+            messageRepository.save(msg);
+            messagingTemplate.convertAndSend("/topic/edit", event);
+        }
+    }
+
+    // ── Delete a message ───────────────────────────────────────
+    @MessageMapping("/delete")
+    public void handleDelete(MessageDeleteEvent event) {
+        Optional<Message> opt = messageRepository.findById(event.getMessageId());
+        if (opt.isPresent()) {
+            Message msg = opt.get();
+            if (!msg.getSender().equals(event.getDeletedBy())) return; // only owner
+            msg.setDeleted(true);
+            msg.setContent("This message was deleted.");
+            messageRepository.save(msg);
+            messagingTemplate.convertAndSend("/topic/delete", event);
         }
     }
 }

@@ -1356,6 +1356,19 @@ const EMOJIS = [
   "⚽", "🏀", "🎮", "🎵", "🎬", "📸", "💻", "📱", "🌈", "🌙",
 ];
 
+const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍", "👎", "🔥"];
+function ReactionPicker({ onSelect, style }) {
+  return (
+    <div style={{ position: "absolute", zIndex: 60, background: "var(--glass2)", border: "1px solid var(--glass-border)", borderRadius: 999, padding: "4px 8px", display: "flex", gap: 2, boxShadow: "0 4px 20px rgba(0,0,0,0.35)", backdropFilter: "blur(20px)", ...style }}>
+      {QUICK_REACTIONS.map((e, i) => (
+        <button key={i} onClick={() => onSelect(e)} style={{ width: 32, height: 32, border: "none", borderRadius: "50%", background: "transparent", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.1s" }}
+          onMouseEnter={ev => ev.currentTarget.style.transform = "scale(1.3)"}
+          onMouseLeave={ev => ev.currentTarget.style.transform = "scale(1)"}>{e}</button>
+      ))}
+    </div>
+  );
+}
+
 function EmojiPicker({ onSelect, emojiRef }) {
   return (
     <div ref={emojiRef} style={{
@@ -1393,6 +1406,23 @@ function EmojiPicker({ onSelect, emojiRef }) {
   );
 }
 
+function IcoEdit({ size = 15, color = "#8b6fd4" }) {
+  return <svg viewBox="0 0 24 24" style={svgBase(size)} fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" style={{ stroke: color, strokeWidth: 1.9, strokeLinecap: "round", fill: "none" }} /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" style={{ stroke: color, strokeWidth: 1.9, strokeLinecap: "round", fill: "none" }} /></svg>;
+}
+function IcoTrash({ size = 15, color = "#fb7185" }) {
+  return <svg viewBox="0 0 24 24" style={svgBase(size)} fill="none"><polyline points="3 6 5 6 21 6" style={{ stroke: color, strokeWidth: 1.9, strokeLinecap: "round" }} /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" style={{ stroke: color, strokeWidth: 1.9, strokeLinecap: "round", fill: "none" }} /><path d="M10 11v6M14 11v6" style={{ stroke: color, strokeWidth: 1.9, strokeLinecap: "round" }} /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" style={{ stroke: color, strokeWidth: 1.9, strokeLinecap: "round", fill: "none" }} /></svg>;
+}
+function IcoPlus({ size = 16, color = "#8b6fd4" }) {
+  return <svg viewBox="0 0 24 24" style={svgBase(size)} fill="none"><line x1="12" y1="5" x2="12" y2="19" style={{ stroke: color, strokeWidth: 2.2, strokeLinecap: "round" }} /><line x1="5" y1="12" x2="19" y2="12" style={{ stroke: color, strokeWidth: 2.2, strokeLinecap: "round" }} /></svg>;
+}
+function IcoHash({ size = 16, color = "#8b6fd4" }) {
+  return <svg viewBox="0 0 24 24" style={svgBase(size)} fill="none"><line x1="4" y1="9" x2="20" y2="9" style={{ stroke: color, strokeWidth: 2, strokeLinecap: "round" }} /><line x1="4" y1="15" x2="20" y2="15" style={{ stroke: color, strokeWidth: 2, strokeLinecap: "round" }} /><line x1="10" y1="3" x2="8" y2="21" style={{ stroke: color, strokeWidth: 2, strokeLinecap: "round" }} /><line x1="16" y1="3" x2="14" y2="21" style={{ stroke: color, strokeWidth: 2, strokeLinecap: "round" }} /></svg>;
+}
+
+function IcoBack({ size = 18, color = "#8b6fd4" }) {
+  return <svg viewBox="0 0 24 24" style={svgBase(size)} fill="none"><polyline points="15 18 9 12 15 6" style={{ stroke: color, strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round" }} /></svg>;
+}
+
 function IcoSmile({ size = 20, color = "#8b6fd4" }) {
   const s = svgBase(size);
   return (
@@ -1404,6 +1434,949 @@ function IcoSmile({ size = 20, color = "#8b6fd4" }) {
       <circle cx="9" cy="10" r="0.8" style={{ fill: color }} />
       <circle cx="15" cy="10" r="0.8" style={{ fill: color }} />
     </svg>
+  );
+}
+
+function CreateRoomModal({ onClose, onCreate }) {
+  const [step, setStep] = useState("template"); // template | configure
+  const [template, setTemplate] = useState(null);
+  const [roomName, setRoomName] = useState("");
+  const [roomType, setRoomType] = useState("public");
+
+  const templates = [
+    { id: "own", emoji: "🌟", label: "Create My Own", desc: "Start fresh with a blank room", color: "linear-gradient(135deg,#7c3aed,#a855f7)" },
+    { id: "gaming", emoji: "🎮", label: "Gaming", desc: "A place for your gaming squad", color: "linear-gradient(135deg,#059669,#10b981)" },
+    { id: "friends", emoji: "💖", label: "Friends", desc: "Hang out with your closest friends", color: "linear-gradient(135deg,#db2777,#ec4899)" },
+    { id: "study", emoji: "📚", label: "Study Group", desc: "Collaborate and learn together", color: "linear-gradient(135deg,#d97706,#f59e0b)" },
+    { id: "school", emoji: "🏫", label: "School Club", desc: "Organize your club or class", color: "linear-gradient(135deg,#2563eb,#3b82f6)" },
+    { id: "sports", emoji: "⚽", label: "Sports", desc: "Cheer on your team together", color: "linear-gradient(135deg,#16a34a,#22c55e)" },
+    { id: "music", emoji: "🎵", label: "Music", desc: "Share beats and discover new tracks", color: "linear-gradient(135deg,#7c3aed,#06b6d4)" },
+    { id: "art", emoji: "🎨", label: "Art & Creative", desc: "A canvas for creators", color: "linear-gradient(135deg,#ea580c,#f97316)" },
+    { id: "tech", emoji: "💻", label: "Tech & Dev", desc: "Build things and share ideas", color: "linear-gradient(135deg,#0891b2,#06b6d4)" },
+    { id: "anime", emoji: "⛩️", label: "Anime & Manga", desc: "Discuss your favorite series", color: "linear-gradient(135deg,#9333ea,#ec4899)" },
+    { id: "travel", emoji: "✈️", label: "Travel", desc: "Share adventures around the world", color: "linear-gradient(135deg,#0284c7,#38bdf8)" },
+    { id: "food", emoji: "🍜", label: "Food & Cooking", desc: "Recipes, restaurants, and more", color: "linear-gradient(135deg,#b45309,#f59e0b)" },
+  ];
+
+  const selectedTemplate = templates.find(t => t.id === template);
+
+  const handleTemplateSelect = (t) => {
+    setTemplate(t.id);
+    setRoomName(t.id === "own" ? "" : t.label + " Room");
+    setStep("configure");
+  };
+
+  const handleCreate = () => {
+    if (!roomName.trim()) return;
+    onCreate({
+      name: roomName.trim(),
+      template,
+      emoji: selectedTemplate?.emoji || "🌟",
+      type: roomType,
+    });
+    onClose();
+  };
+
+  const overlay = {
+    position: "fixed", inset: 0, zIndex: 500,
+    background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    animation: "fadeIn 0.15s", padding: 20,
+  };
+
+  const modal = {
+    width: "100%", maxWidth: 460,
+    background: "var(--glass2)", borderRadius: 20,
+    border: "1px solid var(--glass-border)",
+    boxShadow: "0 32px 80px rgba(0,0,0,0.5)",
+    overflow: "hidden", animation: "scalePop 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+  };
+
+  const inputStyle = {
+    width: "100%", background: "var(--input-bg)",
+    border: "1.5px solid var(--glass-border)", borderRadius: 10,
+    padding: "11px 14px", fontFamily: "inherit", fontSize: 14,
+    color: "var(--text)", outline: "none",
+  };
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={modal}>
+        {/* Header */}
+        <div style={{ padding: "24px 24px 0", textAlign: "center", position: "relative" }}>
+          <button onClick={onClose} style={{ position: "absolute", top: 16, right: 16, background: "var(--btn-bg)", border: "none", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", color: "var(--text-muted)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          {step === "template" ? (
+            <>
+              <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text)", marginBottom: 8 }}>Create Your Room</div>
+              <div style={{ fontSize: 13, color: "var(--text-sub)", lineHeight: 1.6, marginBottom: 20 }}>
+                Your room is where you and your friends hang out.<br />Make yours and start talking.
+              </div>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setStep("template")} style={{ position: "absolute", top: 16, left: 16, background: "var(--btn-bg)", border: "none", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", color: "var(--text-muted)", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>{selectedTemplate?.emoji}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)", marginBottom: 6 }}>
+                {selectedTemplate?.label}
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 20 }}>
+                {selectedTemplate?.desc}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Content */}
+        {step === "template" ? (
+          <div style={{ maxHeight: 380, overflowY: "auto", padding: "0 16px 16px" }}>
+            {/* Create My Own — featured */}
+            <div onClick={() => handleTemplateSelect(templates[0])}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderRadius: 12, background: "var(--accent-soft)", border: "1.5px solid var(--accent)", cursor: "pointer", marginBottom: 16, transition: "transform 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.01)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: templates[0].color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{templates[0].emoji}</div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{templates[0].label}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-sub)" }}>{templates[0].desc}</div>
+                </div>
+              </div>
+              <span style={{ color: "var(--accent)", fontSize: 18 }}>›</span>
+            </div>
+
+            {/* Templates */}
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8, paddingLeft: 4 }}>
+              START FROM A TEMPLATE
+            </div>
+            {templates.slice(1).map(t => (
+              <div key={t.id} onClick={() => handleTemplateSelect(t)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 10, cursor: "pointer", transition: "background 0.15s", marginBottom: 2 }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--glass-border)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: t.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{t.emoji}</div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{t.label}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-sub)" }}>{t.desc}</div>
+                  </div>
+                </div>
+                <span style={{ color: "var(--text-muted)", fontSize: 18 }}>›</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: "0 24px 24px" }}>
+            {/* Room name */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Room Name</div>
+              <input style={inputStyle} value={roomName} onChange={e => setRoomName(e.target.value)}
+                placeholder="Enter room name" autoFocus
+                onKeyDown={e => e.key === "Enter" && handleCreate()} />
+            </div>
+
+            {/* Room type */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Room Type</div>
+              {[
+                { id: "public", emoji: "🌐", label: "Public", desc: "Anyone can join this room" },
+                { id: "private", emoji: "🔒", label: "Private", desc: "Only invited members can join" },
+              ].map(rt => (
+                <div key={rt.id} onClick={() => setRoomType(rt.id)}
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${roomType === rt.id ? "var(--accent)" : "var(--glass-border)"}`, background: roomType === rt.id ? "var(--accent-soft)" : "transparent", cursor: "pointer", marginBottom: 8, transition: "all 0.15s" }}>
+                  <div style={{ fontSize: 22 }}>{rt.emoji}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{rt.label}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-sub)" }}>{rt.desc}</div>
+                  </div>
+                  <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${roomType === rt.id ? "var(--accent)" : "var(--glass-border)"}`, background: roomType === rt.id ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {roomType === rt.id && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Create button */}
+            <button onClick={handleCreate} disabled={!roomName.trim()}
+              style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: roomName.trim() ? "linear-gradient(135deg,#7c3aed,#a855f7)" : "var(--btn-bg)", color: roomName.trim() ? "#fff" : "var(--text-muted)", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: roomName.trim() ? "pointer" : "not-allowed", transition: "all 0.2s", boxShadow: roomName.trim() ? "0 4px 20px rgba(124,58,237,0.35)" : "none" }}>
+              Create Room ✨
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProfileModal({ onClose, authToken, user, onUpdate }) {
+  const [displayName, setDisplayName] = useState(user?.displayName || user?.username || "");
+  const [bio, setBio] = useState(user?.bio || "");
+  const [saving, setSaving] = useState(false);
+  const fileRef = useRef(null);
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`http://192.168.100.127:8080/auth/profile`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ displayName, bio }) });
+      const data = await res.json();
+      onUpdate(data);
+    } catch { }
+    setSaving(false);
+    onClose();
+  };
+  const uploadAvatar = async (file) => {
+    const fd = new FormData(); fd.append("file", file);
+    try {
+      const res = await fetch(`http://192.168.100.127:8080/auth/profile/avatar`, { method: "POST", headers: { Authorization: `Bearer ${authToken}` }, body: fd });
+      const data = await res.json();
+      onUpdate({ avatarUrl: data.avatarUrl });
+    } catch { }
+  };
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ width: 400, background: "var(--glass2)", border: "1px solid var(--glass-border)", borderRadius: 22, padding: "36px 32px", boxShadow: "0 32px 80px rgba(0,0,0,0.5)" }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", marginBottom: 20 }}>Edit Profile</div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+          <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current.click()}>
+            <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--bubble-me)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", overflow: "hidden" }}>
+              {user?.avatarUrl
+                ? <img src={user.avatarUrl.startsWith("http") ? user.avatarUrl : `http://192.168.100.127:8080${user.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => e.target.style.display = "none"} />
+                : (user?.username || "?")[0].toUpperCase()}
+            </div>
+            <div style={{ position: "absolute", bottom: 0, right: 0, width: 22, height: 22, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 700 }}>+</div>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) uploadAvatar(e.target.files[0]); }} />
+        </div>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 6 }}>Display Name</label>
+        <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your display name" style={{ width: "100%", background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 12, padding: "11px 14px", fontFamily: "inherit", fontSize: 14, color: "var(--text)", outline: "none", marginBottom: 14 }} />
+        <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 6 }}>Bio</label>
+        <input value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell others about yourself" style={{ width: "100%", background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 12, padding: "11px 14px", fontFamily: "inherit", fontSize: 14, color: "var(--text)", outline: "none", marginBottom: 20 }} />
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "11px", borderRadius: 12, border: "1.5px solid var(--glass-border)", background: "transparent", color: "var(--text-sub)", fontFamily: "inherit", fontSize: 14, cursor: "pointer" }}>Cancel</button>
+          <button onClick={save} disabled={saving} style={{ flex: 1, padding: "11px", borderRadius: 12, border: "none", background: "var(--bubble-me)", color: "#fff", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function SettingsModal({ onClose, tab, setTab, dark, setDark, authToken, authUser, myProfile, onUpdateProfile,
+  fontSize, setFontSize, bubbleStyle, setBubbleStyle, notifSound, setNotifSound,
+  compactMode, setCompactMode, privacyDm, setPrivacyDm, privacyFriend, setPrivacyFriend, onLogout }) {
+
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwMsg, setPwMsg] = useState(null);
+  const [email, setEmail] = useState(myProfile?.email || "");
+  const [emailMsg, setEmailMsg] = useState(null);
+  const [displayName, setDisplayName] = useState(myProfile?.displayName || "");
+  const [bio, setBio] = useState(myProfile?.bio || "");
+  const [profileMsg, setProfileMsg] = useState(null);
+  const fileRef = useRef(null);
+
+  const BASE = "http://192.168.100.127:8080";
+
+  const tabs = [
+    { id: "account", label: "👤 My Account", group: "USER SETTINGS" },
+    { id: "profile", label: "🪪 Profile", group: "USER SETTINGS" },
+    { id: "privacy", label: "🔒 Privacy & Safety", group: "USER SETTINGS" },
+    { id: "appearance", label: "🎨 Appearance", group: "APP SETTINGS" },
+    { id: "notifications", label: "🔔 Notifications", group: "APP SETTINGS" },
+    { id: "keybinds", label: "⌨️ Keybinds", group: "APP SETTINGS" },
+    { id: "danger", label: "⚠️ Danger Zone", group: "ACCOUNT" },
+  ];
+
+  const groups = [...new Set(tabs.map(t => t.group))];
+
+  const [verifyCode, setVerifyCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+
+  const sendCode = async () => {
+    setSendingCode(true); setPwMsg(null);
+    try {
+      const res = await fetch(`${BASE}/auth/send-code`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const data = await res.json();
+      if (!res.ok) { setPwMsg({ ok: false, text: data.error }); setSendingCode(false); return; }
+      setCodeSent(true);
+      setPwMsg({ ok: true, text: data.message });
+    } catch { setPwMsg({ ok: false, text: "Server error" }); }
+    setSendingCode(false);
+  };
+
+  const changePassword = async () => {
+    if (!verifyCode || !newPw || !confirmPw) { setPwMsg({ ok: false, text: "Fill in all fields" }); return; }
+    if (newPw !== confirmPw) { setPwMsg({ ok: false, text: "New passwords do not match" }); return; }
+    if (newPw.length < 6) { setPwMsg({ ok: false, text: "Password must be at least 6 characters" }); return; }
+    try {
+      const res = await fetch(`${BASE}/auth/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ code: verifyCode, newPassword: newPw }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPwMsg({ ok: false, text: data.error }); return; }
+      setPwMsg({ ok: true, text: "Password changed successfully!" });
+      setVerifyCode(""); setNewPw(""); setConfirmPw(""); setCodeSent(false);
+    } catch { setPwMsg({ ok: false, text: "Server error" }); }
+  };
+
+  const saveEmail = async () => {
+    try {
+      const res = await fetch(`${BASE}/auth/update-email`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) { setEmailMsg({ ok: false, text: "Failed to update email" }); return; }
+      setEmailMsg({ ok: true, text: "Email updated!" });
+      onUpdateProfile({ email });
+    } catch { setEmailMsg({ ok: false, text: "Server error" }); }
+  };
+
+  const saveProfile = async () => {
+    try {
+      const res = await fetch(`${BASE}/auth/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ displayName, bio }),
+      });
+      const data = await res.json();
+      onUpdateProfile(data);
+      setProfileMsg({ ok: true, text: "Profile saved!" });
+    } catch { setProfileMsg({ ok: false, text: "Server error" }); }
+  };
+
+  const uploadAvatar = async (file) => {
+    const fd = new FormData(); fd.append("file", file);
+    try {
+      const res = await fetch(`${BASE}/auth/profile/avatar`, { method: "POST", headers: { Authorization: `Bearer ${authToken}` }, body: fd });
+      const data = await res.json();
+      onUpdateProfile({ avatarUrl: data.avatarUrl });
+    } catch { }
+  };
+
+  const inputStyle = { width: "100%", background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 10, padding: "10px 14px", fontFamily: "inherit", fontSize: 14, color: "var(--text)", outline: "none", marginBottom: 10 };
+  const labelStyle = { display: "block", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 6 };
+  const sectionTitle = { fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 4, marginTop: 24 };
+  const sectionDesc = { fontSize: 13, color: "var(--text-sub)", marginBottom: 16 };
+  const msgStyle = (ok) => ({ fontSize: 13, padding: "8px 12px", borderRadius: 8, marginBottom: 12, background: ok ? "rgba(74,222,128,0.12)" : "rgba(251,113,133,0.12)", color: ok ? "#4ade80" : "#fb7185", border: `1px solid ${ok ? "rgba(74,222,128,0.3)" : "rgba(251,113,133,0.3)"}` });
+  const saveBtn = { padding: "10px 22px", borderRadius: 10, border: "none", background: "var(--bubble-me)", color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+  const toggleStyle = (on) => ({ width: 44, height: 24, borderRadius: 999, border: "none", cursor: "pointer", position: "relative", background: on ? "var(--accent)" : "var(--btn-bg)", transition: "background 0.2s", flexShrink: 0 });
+  const thumbStyle = (on) => ({ position: "absolute", top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" });
+
+  const Toggle = ({ on, onChange }) => (
+    <button style={toggleStyle(on)} onClick={() => onChange(!on)}>
+      <div style={thumbStyle(on)} />
+    </button>
+  );
+
+  const Row = ({ label, desc, children }) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid var(--divider)", gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{label}</div>
+        {desc && <div style={{ fontSize: 12, color: "var(--text-sub)", marginTop: 3 }}>{desc}</div>}
+      </div>
+      {children}
+    </div>
+  );
+
+  const renderContent = () => {
+    if (tab === "account") return (
+      <div>
+        {/* Profile card */}
+        <div style={{ background: "var(--bubble-me)", borderRadius: 12, padding: "40px 20px 20px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,rgba(196,109,255,0.8),rgba(123,140,255,0.8))" }} />
+          <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 16 }}>
+            <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()}>
+              <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.2)", border: "4px solid var(--glass2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, color: "#fff", overflow: "hidden" }}>
+                {myProfile?.avatarUrl ? <img src={myProfile.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : authUser?.[0]?.toUpperCase()}
+              </div>
+              <div style={{ position: "absolute", bottom: 2, right: 2, width: 22, height: 22, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, border: "2px solid var(--glass2)" }}>✏️</div>
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) uploadAvatar(e.target.files[0]); }} />
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{myProfile?.displayName || authUser}</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>@{authUser}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={sectionTitle}>Account Information</div>
+        <div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px", marginBottom: 20 }}>
+          <Row label="Username" desc={`@${authUser}`}><span style={{ fontSize: 12, color: "var(--text-muted)", padding: "4px 10px", background: "var(--btn-bg)", borderRadius: 6 }}>Cannot change</span></Row>
+          <Row label="Email" desc={myProfile?.email || "No email set"}>
+            <button onClick={() => setTab("account-email")} style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }}>Edit</button>
+          </Row>
+        </div>
+
+        <div style={sectionTitle}>Change Password</div>
+        <div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, marginBottom: 20 }}>
+          {pwMsg && <div style={msgStyle(pwMsg.ok)}>{pwMsg.ok ? "✅" : "⚠️"} {pwMsg.text}</div>}
+          {!codeSent ? (
+            <>
+              <div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14, lineHeight: 1.6 }}>
+                A 6-digit verification code will be sent to your registered email address.
+                {!myProfile?.email && <span style={{ color: "#fb7185" }}> You need to add an email address first.</span>}
+              </div>
+              <button style={{ ...saveBtn, opacity: myProfile?.email ? 1 : 0.5, cursor: myProfile?.email ? "pointer" : "not-allowed" }}
+                onClick={myProfile?.email ? sendCode : undefined} disabled={sendingCode}>
+                {sendingCode ? "Sending…" : "Send Verification Code"}
+              </button>
+            </>
+          ) : (
+            <>
+              <label style={labelStyle}>Verification Code</label>
+              <input style={inputStyle} value={verifyCode} onChange={e => setVerifyCode(e.target.value)} placeholder="Enter 6-digit code" maxLength={6} />
+              <label style={labelStyle}>New Password</label>
+              <input type="password" style={inputStyle} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Enter new password" />
+              <label style={labelStyle}>Confirm New Password</label>
+              <input type="password" style={{ ...inputStyle, marginBottom: 14 }} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Confirm new password" />
+              <div style={{ display: "flex", gap: 10 }}>
+                <button style={saveBtn} onClick={changePassword}>Change Password</button>
+                <button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => { setCodeSent(false); setPwMsg(null); setVerifyCode(""); }}>Resend Code</button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div style={sectionTitle}>Email Address</div>
+        <div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>
+          {emailMsg && <div style={msgStyle(emailMsg.ok)}>{emailMsg.ok ? "✅" : "⚠️"} {emailMsg.text}</div>}
+          <label style={labelStyle}>Email</label>
+          <input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" />
+          <button style={saveBtn} onClick={saveEmail}>Save Email</button>
+        </div>
+      </div>
+    );
+
+    if (tab === "profile") return (
+      <div>
+        <div style={sectionTitle}>Display Name</div>
+        <p style={sectionDesc}>This is how others see you in chat.</p>
+        {profileMsg && <div style={msgStyle(profileMsg.ok)}>{profileMsg.ok ? "✅" : "⚠️"} {profileMsg.text}</div>}
+        <div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, marginBottom: 20 }}>
+          <label style={labelStyle}>Display Name</label>
+          <input style={inputStyle} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your display name" />
+          <label style={labelStyle}>Bio</label>
+          <textarea style={{ ...inputStyle, height: 80, resize: "none" }} value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell others about yourself" />
+          <button style={saveBtn} onClick={saveProfile}>Save Profile</button>
+        </div>
+
+        <div style={sectionTitle}>Avatar</div>
+        <div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--bubble-me)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", overflow: "hidden", flexShrink: 0 }}>
+            {myProfile?.avatarUrl ? <img src={myProfile.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : authUser?.[0]?.toUpperCase()}
+          </div>
+          <div>
+            <div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 10 }}>JPG, GIF or PNG. Max size 8MB.</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={saveBtn} onClick={() => fileRef.current?.click()}>Change Avatar</button>
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) uploadAvatar(e.target.files[0]); }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    if (tab === "appearance") return (
+      <div>
+        <div style={sectionTitle}>Theme</div>
+        <p style={sectionDesc}>Choose how CosmoChatlooks to you.</p>
+        <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+          {[{ id: "dark", label: "🌙 Dark" }, { id: "light", label: "☀️ Light" }].map(t => (
+            <button key={t.id} onClick={() => setDark(t.id === "dark")}
+              style={{ flex: 1, padding: "16px", borderRadius: 12, border: `2px solid ${(dark ? "dark" : "light") === t.id ? "var(--accent)" : "var(--glass-border)"}`, background: (dark ? "dark" : "light") === t.id ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={sectionTitle}>Font Size</div>
+        <p style={sectionDesc}>Scale the chat text to your preference.</p>
+        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+          {["small", "medium", "large"].map(s => (
+            <button key={s} onClick={() => setFontSize(s)}
+              style={{ flex: 1, padding: "12px", borderRadius: 10, border: `2px solid ${fontSize === s ? "var(--accent)" : "var(--glass-border)"}`, background: fontSize === s ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: s === "small" ? 12 : s === "medium" ? 14 : 16, fontWeight: 600, cursor: "pointer", textTransform: "capitalize" }}>
+              {s}
+            </button>
+          ))}
+        </div>
+
+        <div style={sectionTitle}>Message Bubble Style</div>
+        <p style={sectionDesc}>Change how message bubbles look.</p>
+        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+          {["rounded", "sharp", "minimal"].map(s => (
+            <button key={s} onClick={() => setBubbleStyle(s)}
+              style={{ flex: 1, padding: "12px", borderRadius: 10, border: `2px solid ${bubbleStyle === s ? "var(--accent)" : "var(--glass-border)"}`, background: bubbleStyle === s ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", textTransform: "capitalize" }}>
+              {s}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px" }}>
+          <Row label="Compact Mode" desc="Reduce spacing between messages">
+            <Toggle on={compactMode} onChange={setCompactMode} />
+          </Row>
+        </div>
+      </div>
+    );
+
+    if (tab === "notifications") return (
+      <div>
+        <div style={sectionTitle}>Notifications</div>
+        <p style={sectionDesc}>Control how and when you get notified.</p>
+        <div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px" }}>
+          <Row label="Message Sound" desc="Play a sound when a message arrives">
+            <Toggle on={notifSound} onChange={setNotifSound} />
+          </Row>
+          <Row label="Desktop Notifications" desc="Show notifications outside the browser">
+            <button style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }} onClick={() => Notification.requestPermission()}>
+              {Notification.permission === "granted" ? "✅ Enabled" : "Enable"}
+            </button>
+          </Row>
+        </div>
+      </div>
+    );
+
+    if (tab === "privacy") return (
+      <div>
+        <div style={sectionTitle}>Privacy & Safety</div>
+        <p style={sectionDesc}>Control who can interact with you.</p>
+        <div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px", marginBottom: 20 }}>
+          <Row label="Who can DM me" desc="Control who can send you direct messages">
+            <select value={privacyDm} onChange={e => setPrivacyDm(e.target.value)}
+              style={{ background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 8, padding: "6px 12px", color: "var(--text)", fontFamily: "inherit", fontSize: 13, outline: "none" }}>
+              <option value="everyone">Everyone</option>
+              <option value="friends">Friends only</option>
+              <option value="nobody">Nobody</option>
+            </select>
+          </Row>
+          <Row label="Who can send friend requests" desc="Control who can add you as a friend">
+            <select value={privacyFriend} onChange={e => setPrivacyFriend(e.target.value)}
+              style={{ background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 8, padding: "6px 12px", color: "var(--text)", fontFamily: "inherit", fontSize: 13, outline: "none" }}>
+              <option value="everyone">Everyone</option>
+              <option value="nobody">Nobody</option>
+            </select>
+          </Row>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
+          ⚠️ Privacy settings are stored locally and enforced on the frontend only. Full server-side enforcement coming soon.
+        </div>
+      </div>
+    );
+
+    if (tab === "keybinds") return (
+      <div>
+        <div style={sectionTitle}>Keyboard Shortcuts</div>
+        <p style={sectionDesc}>Helpful shortcuts to navigate faster.</p>
+        <div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px" }}>
+          {[
+            { keys: "Enter", action: "Send message" },
+            { keys: "Shift + Enter", action: "New line in message" },
+            { keys: "Esc", action: "Close modals / cancel edit" },
+            { keys: "↑ Arrow", action: "Edit last message" },
+          ].map((k, i) => (
+            <Row key={i} label={k.action}>
+              <kbd style={{ background: "var(--btn-bg)", border: "1px solid var(--glass-border)", borderRadius: 6, padding: "3px 10px", fontSize: 12, fontFamily: "monospace", color: "var(--text)" }}>{k.keys}</kbd>
+            </Row>
+          ))}
+        </div>
+      </div>
+    );
+
+    if (tab === "danger") return (
+      <div>
+        <div style={{ ...sectionTitle, color: "#fb7185" }}>⚠️ Danger Zone</div>
+        <p style={sectionDesc}>These actions are irreversible. Please be careful.</p>
+        <div style={{ background: "rgba(251,113,133,0.07)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 10, padding: 20, marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#fb7185", marginBottom: 6 }}>Log Out</div>
+          <div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14 }}>Sign out of your account on this device.</div>
+          <button onClick={onLogout} style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(251,113,133,0.3)", background: "rgba(251,113,133,0.15)", color: "#fb7185", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>            Log Out
+          </button>
+        </div>
+        <div style={{ background: "rgba(251,113,133,0.07)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 10, padding: 20 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#fb7185", marginBottom: 6 }}>Delete Account</div>
+          <div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14 }}>Permanently delete your account and all your data. This cannot be undone.</div>
+          <button style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(251,113,133,0.4)", background: "#fb7185", color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+            onClick={() => alert("Account deletion requires backend implementation. Contact your admin.")}>
+            Delete Account
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "stretch", justifyContent: "center", animation: "fadeIn 0.15s" }}>
+      <div style={{ display: "flex", width: "100%", maxWidth: 900, margin: "auto", height: "min(680px, 90vh)", background: "var(--glass2)", borderRadius: 16, overflow: "hidden", border: "1px solid var(--glass-border)", boxShadow: "0 32px 80px rgba(0,0,0,0.5)" }}>
+        {/* Sidebar */}
+        <div style={{ width: 220, background: dark ? "rgba(10,7,22,0.95)" : "rgba(240,236,255,0.98)", borderRight: "1px solid var(--divider)", display: "flex", flexDirection: "column", padding: "20px 8px", overflowY: "auto", flexShrink: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--text-muted)", padding: "6px 10px 4px", marginBottom: 2 }}>Settings</div>
+          {groups.map(group => (
+            <div key={group}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--text-muted)", padding: "14px 10px 4px" }}>{group}</div>
+              {tabs.filter(t => t.group === group).map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", borderRadius: 8, border: "none", background: tab === t.id ? "var(--accent-soft)" : "transparent", color: tab === t.id ? "var(--accent)" : "var(--text-sub)", fontFamily: "inherit", fontSize: 13, fontWeight: tab === t.id ? 700 : 500, cursor: "pointer", marginBottom: 1, transition: "all 0.15s" }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          ))}
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 8, border: "none", background: "transparent", color: "var(--text-muted)", fontFamily: "inherit", fontSize: 13, cursor: "pointer", marginTop: 8 }}>
+            ✕ Close Settings
+          </button>
+        </div>
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "32px 40px" }}>
+          {renderContent()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function FriendsPage({ allUsers, onlineUsers, friends, friendReqs, incomingReqs, onSendReq, onAccept, onRemove, onDm, name }) {
+  const [tab, setTab] = useState("all");
+  const [addUsername, setAddUsername] = useState("");
+  const [search, setSearch] = useState("");
+  const others = allUsers.filter(u => u !== name);
+
+  const tabs = [
+    { id: "online", label: "Online" },
+    { id: "all", label: "All" },
+    { id: "friends", label: "Friends" },
+    { id: "pending", label: "Pending", badge: incomingReqs.length },
+    { id: "add", label: "+ Add Friend", primary: true },
+  ];
+
+  const getList = () => {
+    let list = [];
+    if (tab === "online") list = others.filter(u => onlineUsers.includes(u));
+    else if (tab === "all") list = friends;
+    else if (tab === "friends") list = friends;
+    else if (tab === "pending") list = incomingReqs;
+    else return [];
+    if (search.trim()) list = list.filter(u => u.toLowerCase().includes(search.toLowerCase()));
+    return list;
+  };
+
+  const list = getList();
+
+  const avatarGradients = [
+    "linear-gradient(135deg,#7c3aed,#a855f7)",
+    "linear-gradient(135deg,#06b6d4,#7c3aed)",
+    "linear-gradient(135deg,#ec4899,#a855f7)",
+    "linear-gradient(135deg,#059669,#06b6d4)",
+    "linear-gradient(135deg,#f59e0b,#ec4899)",
+    "linear-gradient(135deg,#0284c7,#7c3aed)",
+    "linear-gradient(135deg,#d97706,#f97316)",
+  ];
+  const getGradient = (u) => avatarGradients[u.charCodeAt(0) % avatarGradients.length];
+
+  const sectionLabel = () => {
+    if (tab === "online") return `Online — ${list.length}`;
+    if (tab === "all") return `All Friends — ${list.length}`;
+    if (tab === "friends") return `All Friends — ${list.length}`;
+    if (tab === "pending") return `Pending — ${list.length}`;
+    return "";
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+
+      {/* ── Top bar ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 20px", height: 60, background: "var(--glass2)", borderBottom: "1px solid var(--divider)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingRight: 16, borderRight: "1px solid var(--divider)", marginRight: 4 }}>
+          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>👥</div>
+          <span style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>Friends</span>
+        </div>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id); setSearch(""); }}
+            style={{
+              position: "relative", padding: "5px 14px", border: "none", borderRadius: 8,
+              fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", marginRight: 2,
+              background: t.primary
+                ? "linear-gradient(135deg,#7c3aed,#a855f7)"
+                : tab === t.id ? "rgba(124,58,237,0.18)" : "transparent",
+              color: t.primary ? "#fff" : tab === t.id ? "#c084fc" : "var(--text-sub)",
+              boxShadow: t.primary ? "0 2px 12px rgba(124,58,237,0.35)" : "none",
+              transition: "all 0.15s",
+            }}>
+            {t.label}
+            {t.badge > 0 && (
+              <span style={{ marginLeft: 5, background: "#fb7185", color: "#fff", borderRadius: 999, fontSize: 10, fontWeight: 700, padding: "1px 5px" }}>{t.badge}</span>
+            )}
+          </button>
+        ))}
+        <div style={{ flex: 1 }} />
+        {/* Search in topbar for all/friends/online */}
+        {(tab === "all" || tab === "friends" || tab === "online") && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--input-bg)", border: "1px solid var(--glass-border)", borderRadius: 8, padding: "6px 12px", minWidth: 180 }}>
+            <span style={{ fontSize: 12, opacity: 0.4 }}>🔍</span>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search"
+              style={{ background: "transparent", border: "none", outline: "none", fontFamily: "inherit", fontSize: 13, color: "var(--text)", width: "100%" }} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Body ── */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+        {/* Friends list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+          {tab === "add" ? (
+            <div style={{ maxWidth: 500 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text)", marginBottom: 6 }}>Add a Friend</div>
+              <div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 20, lineHeight: 1.6 }}>
+                You can add friends by their exact username. It's case sensitive!
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", background: "var(--input-bg)", border: "1.5px solid rgba(124,58,237,0.3)", borderRadius: 12, padding: "4px 4px 4px 16px", boxShadow: "0 0 0 4px rgba(124,58,237,0.06)" }}>
+                <input value={addUsername} onChange={e => setAddUsername(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && addUsername.trim()) { onSendReq(addUsername.trim()); setAddUsername(""); } }}
+                  placeholder="Enter a username"
+                  style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontFamily: "inherit", fontSize: 14, color: "var(--text)", padding: "8px 0" }} />
+                <button disabled={!addUsername.trim()} onClick={() => { onSendReq(addUsername.trim()); setAddUsername(""); }}
+                  style={{ padding: "9px 18px", borderRadius: 9, border: "none", background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: addUsername.trim() ? "pointer" : "not-allowed", opacity: addUsername.trim() ? 1 : 0.5, boxShadow: "0 2px 12px rgba(124,58,237,0.3)" }}>
+                  Send Request
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(168,85,247,0.6)", paddingBottom: 10, borderBottom: "1px solid var(--divider)", marginBottom: 4 }}>
+                {sectionLabel()}
+              </div>
+
+              {list.length === 0 && (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 12, color: "var(--text-muted)" }}>
+                  <div style={{ fontSize: 56, opacity: 0.3 }}>{tab === "online" ? "😴" : tab === "friends" ? "👋" : "📭"}</div>
+                  <div style={{ fontSize: 14 }}>
+                    {tab === "online" ? "No one's online right now." : tab === "friends" ? "No friends yet — add some!" : tab === "pending" ? "No pending requests." : "No users found."}
+                  </div>
+                </div>
+              )}
+
+              {list.map((user, i) => (
+                <div key={i}
+                  style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", borderRadius: 12, transition: "all 0.15s", cursor: "default", marginBottom: 2, border: "1px solid transparent" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(124,58,237,0.08)"; e.currentTarget.style.borderColor = "rgba(124,58,237,0.15)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }}>
+
+                  {/* Avatar */}
+                  <div style={{ position: "relative", width: 42, height: 42, borderRadius: "50%", background: getGradient(user), flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: "#fff" }}>
+                    {user[0]?.toUpperCase()}
+                    <div style={{ position: "absolute", bottom: 1, right: 1, width: 12, height: 12, borderRadius: "50%", background: onlineUsers.includes(user) ? "#10b981" : "rgba(255,255,255,0.15)", border: "2.5px solid var(--glass2)", boxShadow: onlineUsers.includes(user) ? "0 0 6px #10b981" : "none" }} />
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{user}</div>
+                    <div style={{ fontSize: 12, color: onlineUsers.includes(user) ? "#10b981" : "var(--text-sub)", marginTop: 2 }}>
+                      {onlineUsers.includes(user) ? "● Active now" : "○ Offline"}
+                    </div>
+                  </div>
+
+                  {/* Actions — shown on hover via parent */}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    {tab === "pending" ? (
+                      <>
+                        <button onClick={() => onAccept(user)} title="Accept"
+                          style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "rgba(74,222,128,0.15)", color: "#4ade80", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✓</button>
+                        <button onClick={() => onRemove(user)} title="Decline"
+                          style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "rgba(251,113,133,0.15)", color: "#fb7185", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => onDm(user)} title="Message"
+                          style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "rgba(124,58,237,0.12)", color: "#c084fc", fontSize: 17, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "rgba(124,58,237,0.25)"; e.currentTarget.style.boxShadow = "0 0 10px rgba(124,58,237,0.3)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "rgba(124,58,237,0.12)"; e.currentTarget.style.boxShadow = "none"; }}>💬</button>
+                        {friends.includes(user) ? (
+                          <button onClick={() => onRemove(user)} title="Remove friend"
+                            style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "rgba(251,113,133,0.1)", color: "#fb7185", fontSize: 17, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                            onMouseEnter={e => e.currentTarget.style.background = "rgba(251,113,133,0.2)"}
+                            onMouseLeave={e => e.currentTarget.style.background = "rgba(251,113,133,0.1)"}>⋮</button>
+                        ) : friendReqs.includes(user) ? (
+                          <button style={{ height: 32, padding: "0 12px", borderRadius: 8, border: "1px solid var(--glass-border)", background: "transparent", color: "var(--text-muted)", fontSize: 11, cursor: "default", display: "flex", alignItems: "center", justifyContent: "center" }}>Sent</button>
+                        ) : (
+                          <button onClick={() => onSendReq(user)} title="Add Friend"
+                            style={{ height: 32, padding: "0 14px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s", boxShadow: "0 2px 10px rgba(124,58,237,0.3)", fontFamily: "inherit" }}
+                            onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(124,58,237,0.5)"}
+                            onMouseLeave={e => e.currentTarget.style.boxShadow = "0 2px 10px rgba(124,58,237,0.3)"}>+ Add</button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* ── Right panel — Active Now / Cosmos Status ── */}
+        <div style={{ width: 240, borderLeft: "1px solid var(--divider)", padding: "20px 16px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 20, overflowY: "auto" }}>
+
+          {/* Active Now */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(168,85,247,0.6)", marginBottom: 12 }}>Active Now</div>
+            {onlineUsers.filter(u => u !== name).length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>🌌</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-sub)", marginBottom: 4 }}>It's quiet for now...</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>When a friend goes active, you'll see them here</div>
+              </div>
+            ) : (
+              onlineUsers.filter(u => u !== name).map((u, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 0", borderBottom: "1px solid var(--divider)" }}>
+                  <div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: getGradient(u), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+                    {u[0]?.toUpperCase()}
+                    <div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: "#10b981", border: "2px solid var(--glass2)", boxShadow: "0 0 6px #10b981" }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u}</div>
+                    <div style={{ fontSize: 11, color: "#10b981" }}>Active now</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Cosmos Status */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(168,85,247,0.6)", marginBottom: 12 }}>Cosmos Status</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.12)" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", boxShadow: "0 0 6px #10b981", flexShrink: 0 }} />
+                <div style={{ fontSize: 12, color: "var(--text-sub)" }}><span style={{ fontWeight: 700, color: "var(--text)" }}>{onlineUsers.filter(u => u !== name).length}</span> in your orbit</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.12)" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#a855f7", boxShadow: "0 0 6px #a855f7", flexShrink: 0 }} />
+                <div style={{ fontSize: 12, color: "var(--text-sub)" }}><span style={{ fontWeight: 700, color: "var(--text)" }}>{friends.length}</span> friends total</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, background: "rgba(251,113,133,0.06)", border: "1px solid rgba(251,113,133,0.12)" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fb7185", boxShadow: "0 0 6px #fb7185", flexShrink: 0 }} />
+                <div style={{ fontSize: 12, color: "var(--text-sub)" }}><span style={{ fontWeight: 700, color: "var(--text)" }}>{incomingReqs.length}</span> pending requests</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+function FriendsPanel({ onClose, allUsers, onlineUsers, friends, friendReqs, incomingReqs, onSendReq, onAccept, onRemove, onDm, name }) {
+  const [tab, setTab] = useState("all"); // "all" | "friends" | "requests"
+  const tabStyle = (t) => ({
+    flex: 1, padding: "7px", border: "none", borderRadius: 8, fontFamily: "inherit",
+    fontSize: 12, fontWeight: 700, cursor: "pointer",
+    background: tab === t ? "var(--bubble-me)" : "transparent",
+    color: tab === t ? "#fff" : "var(--text-sub)",
+    transition: "all 0.15s",
+  });
+  const others = allUsers.filter(u => u !== name);
+  return (
+    <div className="friends-panel">
+      <div className="friends-hdr">
+        <div className="friends-title">👥 People</div>
+        <button className="friends-close" onClick={onClose}>✕</button>
+      </div>
+      <div style={{ display: "flex", gap: 3, padding: "10px 12px 0", background: "var(--glass2)" }}>
+        <button style={tabStyle("all")} onClick={() => setTab("all")}>All Users</button>
+        <button style={tabStyle("friends")} onClick={() => setTab("friends")}>
+          Friends {friends.length > 0 && <span style={{ marginLeft: 4, opacity: 0.7 }}>({friends.length})</span>}
+        </button>
+        <button style={tabStyle("requests")} onClick={() => setTab("requests")}>
+          Requests {incomingReqs.length > 0 && <span style={{ marginLeft: 4, opacity: 0.7 }}>({incomingReqs.length})</span>}
+        </button>
+      </div>
+      <div className="friends-body">
+        {tab === "all" && <>
+          <div className="friends-section">All Users — {others.length}</div>
+          {others.map((user, i) => (
+            <div key={i} className="friend-item">
+              <div className="friend-av">
+                {user[0].toUpperCase()}
+                {onlineUsers.includes(user) && <div className="c-online" />}
+              </div>
+              <div className="friend-info">
+                <div className="friend-name">{user}</div>
+                <div className="friend-status">{onlineUsers.includes(user) ? "🟢 Online" : "⚪ Offline"}</div>
+              </div>
+              <div className="friend-actions">
+                {friends.includes(user) ? (
+                  <>
+                    <button className="friend-btn primary" onClick={() => onDm(user)}>DM</button>
+                    <button className="friend-btn danger" onClick={() => onRemove(user)}>Unfriend</button>
+                  </>
+                ) : friendReqs.includes(user) ? (
+                  <button className="friend-btn danger" style={{ opacity: 0.6, cursor: "default" }}>Sent ✓</button>
+                ) : (
+                  <button className="friend-btn primary" onClick={() => onSendReq(user)}>+ Add</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </>}
+
+        {tab === "friends" && <>
+          <div className="friends-section">Your Friends — {friends.length}</div>
+          {friends.length === 0 && <div style={{ padding: "20px 6px", fontSize: 13, color: "var(--text-muted)" }}>No friends yet. Go to All Users to add some!</div>}
+          {friends.map((user, i) => (
+            <div key={i} className="friend-item">
+              <div className="friend-av">
+                {user[0].toUpperCase()}
+                {onlineUsers.includes(user) && <div className="c-online" />}
+              </div>
+              <div className="friend-info">
+                <div className="friend-name">{user}</div>
+                <div className="friend-status">{onlineUsers.includes(user) ? "🟢 Online" : "⚪ Offline"}</div>
+              </div>
+              <div className="friend-actions">
+                <button className="friend-btn primary" onClick={() => { onDm(user); onClose(); }}>DM</button>
+                <button className="friend-btn danger" onClick={() => onRemove(user)}>Remove</button>
+              </div>
+            </div>
+          ))}
+        </>}
+
+        {tab === "requests" && <>
+          <div className="friends-section">Incoming Requests — {incomingReqs.length}</div>
+          {incomingReqs.length === 0 && <div style={{ padding: "20px 6px", fontSize: 13, color: "var(--text-muted)" }}>No pending requests.</div>}
+          {incomingReqs.map((user, i) => (
+            <div key={i} className="friend-item">
+              <div className="friend-av">{user[0].toUpperCase()}</div>
+              <div className="friend-info">
+                <div className="friend-name">{user}</div>
+                <div className="friend-status">Wants to be friends</div>
+              </div>
+              <div className="friend-actions">
+                <button className="friend-btn accept" onClick={() => onAccept(user)}>Accept</button>
+                <button className="friend-btn danger" onClick={() => onRemove(user)}>Decline</button>
+              </div>
+            </div>
+          ))}
+          <div className="friends-section">Sent Requests — {friendReqs.length}</div>
+          {friendReqs.length === 0 && <div style={{ padding: "8px 6px", fontSize: 13, color: "var(--text-muted)" }}>No sent requests.</div>}
+          {friendReqs.map((user, i) => (
+            <div key={i} className="friend-item">
+              <div className="friend-av">{user[0].toUpperCase()}</div>
+              <div className="friend-info">
+                <div className="friend-name">{user}</div>
+                <div className="friend-status">Request pending…</div>
+              </div>
+            </div>
+          ))}
+        </>}
+      </div>
+    </div>
   );
 }
 
@@ -1440,12 +2413,12 @@ const buildCSS = (dark) => `
 
   .page {
     position:fixed; inset:0; z-index:1;
-    display:flex; align-items:center; justify-content:center; padding:14px;
+    display:flex; align-items:center; justify-content:center; padding:0;
   }
 
   /* ── THEME TOGGLE ── */
-  .theme-fab {
-    position:fixed; top:18px; right:18px; z-index:10;
+ .theme-fab {
+    position:fixed; top:10px; right:10px; z-index:999;
     width:44px; height:26px; border:none; cursor:pointer; padding:0;
     border-radius:999px; background:${dark ? "rgba(30,18,55,0.85)" : "rgba(255,255,255,0.85)"};
     backdrop-filter:blur(14px);
@@ -1499,11 +2472,13 @@ const buildCSS = (dark) => `
   /* ── CHAT WINDOW ── */
   .chat-window {
     display:flex; flex-direction:row;
-    width:min(1300px, calc(100vw - 28px));
-    height:min(840px, calc(100vh - 28px));
+    width:100vw;
+    height:100vh;
+    min-width:0;
+    overflow-x:hidden;
     background:var(--glass);
     backdrop-filter:blur(36px) saturate(180%); -webkit-backdrop-filter:blur(36px) saturate(180%);
-    border:1px solid var(--glass-border); border-radius:22px; overflow:hidden;
+    border:1px solid var(--glass-border); border-radius:0; overflow:hidden;
     box-shadow:0 40px 110px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.05);
     animation:riseUp 0.42s var(--out) forwards;
   }
@@ -1511,7 +2486,7 @@ const buildCSS = (dark) => `
   /* ── SIDEBAR ── */
   .sidebar {
     width:300px; min-width:300px; height:100%;
-    display:flex; flex-direction:column;
+    flex-direction:column;
     background:var(--glass2); backdrop-filter:blur(20px);
     border-right:1px solid var(--divider); flex-shrink:0;
   }
@@ -1662,6 +2637,86 @@ const buildCSS = (dark) => `
   .rec-badge { display:flex; align-items:center; gap:6px; padding:6px 6px 0; font-size:12px; font-weight:500; color:var(--red); animation:fadeIn 0.2s; }
   .rec-dot   { width:7px; height:7px; background:var(--red); border-radius:50%; animation:blink 1s infinite; }
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+  .sb-section { padding:13px 16px 5px; font-size:9.5px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; justify-content:space-between; }
+  .sb-add-btn { width:20px; height:20px; border:none; background:var(--btn-bg); border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .sb-add-btn:hover { background:var(--accent-soft); }
+  .c-unread { min-width:18px; height:18px; border-radius:999px; background:var(--accent); color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; padding:0 4px; }
+  .msg-bubble.deleted { opacity:0.55; font-style:italic; font-size:13px; }
+  .reactions-row { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
+  .reaction-chip { display:flex; align-items:center; gap:3px; padding:2px 7px; border-radius:999px; background:var(--btn-bg); border:1px solid var(--glass-border); cursor:pointer; font-size:13px; transition:background 0.15s; }
+  .reaction-chip:hover { background:var(--accent-soft); border-color:var(--accent); }
+  .reaction-chip.mine { background:var(--accent-soft); border-color:var(--accent); }
+  .reaction-count { font-size:11px; font-weight:700; color:var(--text-sub); }
+  .msg-actions { position:absolute; top:-34px; display:flex; gap:3px; background:var(--glass2); border:1px solid var(--glass-border); border-radius:10px; padding:4px 6px; box-shadow:0 4px 16px rgba(0,0,0,0.3); opacity:0; pointer-events:none; transition:opacity 0.15s; z-index:10; }
+  .msg-group.me    .msg-actions { right:0; }
+  .msg-group.other .msg-actions { left:34px; }
+  .msg-row:hover .msg-actions { opacity:1; pointer-events:all; }
+  .action-btn { width:26px; height:26px; border:none; background:transparent; border-radius:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.12s; }
+  .action-btn:hover { background:var(--hover); }
+  .edit-bar { display:flex; align-items:center; gap:8px; padding:5px 16px 0; font-size:12px; color:var(--accent); }
+  .edit-bar button { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:11px; font-family:inherit; padding:0; }
+  .msg-search-bar { display:flex; align-items:center; gap:8px; padding:8px 16px; background:var(--glass2); border-bottom:1px solid var(--divider); animation:fadeIn 0.15s; }
+  .msg-search-input { flex:1; background:var(--input-bg); border:1.5px solid var(--glass-border); border-radius:10px; padding:7px 12px; font-family:inherit; font-size:13px; color:var(--text); outline:none; }
+  .msg-search-input:focus { border-color:var(--accent); }
+  .msg-search-nav { display:flex; align-items:center; gap:4px; }
+  .msg-search-btn { width:28px; height:28px; border:none; background:var(--btn-bg); border-radius:8px; cursor:pointer; color:var(--text-sub); font-size:14px; display:flex; align-items:center; justify-content:center; }
+  .msg-search-btn:hover { background:var(--accent-soft); }
+  .friends-panel { position:fixed; top:0; right:0; width:320px; height:100vh; z-index:150; background:var(--glass2); border-left:1px solid var(--divider); backdrop-filter:blur(24px); display:flex; flex-direction:column; box-shadow:-8px 0 40px rgba(0,0,0,0.3); animation:slideInRight 0.25s var(--out); }
+  @keyframes slideInRight { from{transform:translateX(100%)} to{transform:none} }
+  .friends-hdr { padding:20px 18px 14px; border-bottom:1px solid var(--divider); display:flex; align-items:center; gap:10px; }
+  .friends-title { font-size:16px; font-weight:700; color:var(--text); flex:1; }
+  .friends-close { width:30px; height:30px; border:none; background:var(--btn-bg); border-radius:8px; cursor:pointer; color:var(--text-sub); font-size:16px; display:flex; align-items:center; justify-content:center; }
+  .friends-close:hover { background:var(--accent-soft); }
+  .friends-body { flex:1; overflow-y:auto; padding:10px 12px; }
+  .friends-section { font-size:9.5px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-muted); padding:10px 6px 5px; }
+  .friend-item { display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:12px; transition:background 0.15s; }
+  .friend-item:hover { background:var(--hover); }
+  .friend-av { width:38px; height:38px; border-radius:50%; background:var(--bubble-me); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:#fff; position:relative; }
+  .friend-info { flex:1; min-width:0; }
+  .friend-name { font-size:13px; font-weight:600; color:var(--text); }
+  .friend-status { font-size:11.5px; color:var(--text-sub); margin-top:1px; }
+  .friend-actions { display:flex; gap:5px; }
+  .friend-btn { padding:4px 10px; border-radius:8px; border:none; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; }
+  .friend-btn.primary { background:var(--bubble-me); color:#fff; }
+  .friend-btn.danger  { background:rgba(251,113,133,0.15); color:#fb7185; border:1px solid rgba(251,113,133,0.3); }
+  .friend-btn.accept  { background:rgba(74,222,128,0.15); color:#4ade80; border:1px solid rgba(74,222,128,0.3); }
+  .friend-req-badge { min-width:18px; height:18px; border-radius:999px; background:#fb7185; color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; padding:0 4px; }
+  .msg-search-count { font-size:12px; color:var(--text-muted); min-width:48px; text-align:center; font-family:'Fira Code',monospace; }
+  .msg-highlight { background:rgba(196,109,255,0.35); border-radius:3px; padding:0 2px; }
+  .msg-highlight.active { background:rgba(196,109,255,0.7); color:#fff; }
+  .friends-page { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; background:transparent; }
+  .friends-page-hdr { display:flex; align-items:center; gap:0; padding:0 24px; height:60px; background:var(--glass2); border-bottom:1px solid var(--divider); flex-shrink:0; }
+  .friends-page-title { font-size:15px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; padding-right:20px; border-right:1px solid var(--divider); margin-right:16px; }
+  .fp-tab { padding:6px 14px; border:none; border-radius:6px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; background:transparent; color:var(--text-sub); transition:all 0.15s; margin-right:4px; }
+  .fp-tab:hover { background:var(--hover); color:var(--text); }
+  .fp-tab.active { background:var(--accent-soft); color:var(--accent); }
+  .fp-tab.add { background:var(--green); color:#fff; }
+  .fp-tab.add:hover { opacity:0.85; }
+  .friends-page-body { flex:1; overflow-y:auto; padding:20px 28px; }
+  .friends-page-body::-webkit-scrollbar { width:4px; }
+  .friends-page-body::-webkit-scrollbar-thumb { background:var(--scrollbar); border-radius:4px; }
+  .fp-section-label { font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-muted); padding:8px 0 10px; border-bottom:1px solid var(--divider); margin-bottom:6px; }
+  .fp-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:12px; color:var(--text-muted); font-size:14px; padding-bottom:60px; }
+  .fp-empty-icon { font-size:64px; opacity:0.4; }
+  .fp-user-row { display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:12px; transition:background 0.15s; border-bottom:1px solid var(--divider); cursor:default; }
+  .fp-user-row:hover { background:var(--hover); }
+  .fp-user-av { width:42px; height:42px; border-radius:50%; background:var(--bubble-me); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; color:#fff; position:relative; }
+  .fp-user-info { flex:1; min-width:0; }
+  .fp-user-name { font-size:14px; font-weight:700; color:var(--text); }
+  .fp-user-status { font-size:12px; color:var(--text-sub); margin-top:2px; }
+  .fp-user-actions { display:flex; gap:8px; }
+  .fp-action-btn { width:36px; height:36px; border-radius:50%; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; transition:background 0.15s; background:var(--btn-bg); }
+  .fp-action-btn:hover { background:var(--accent-soft); }
+  .fp-add-input { width:100%; background:var(--input-bg); border:1.5px solid var(--glass-border); border-radius:12px; padding:12px 16px; font-family:inherit; font-size:14px; color:var(--text); outline:none; margin-bottom:16px; }
+  .fp-add-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .fp-add-hint { font-size:13px; color:var(--text-sub); margin-bottom:20px; line-height:1.6; }
+  .fp-send-btn { padding:10px 22px; border-radius:10px; border:none; background:var(--bubble-me); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .fp-send-btn:disabled { opacity:0.5; cursor:default; }
+  .sb-user { display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer; padding:6px 8px; border-radius:12px; transition:background 0.15s; }
+  .sb-user:hover { background:var(--hover); }
+  .sb-user-av { width:36px; height:36px; border-radius:50%; background:var(--bubble-me); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:#fff; overflow:hidden; }
+  .sb-user-name { font-size:14px; font-weight:700; color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 `;
 
 /* ─────────────────────────────────────────────────────────
@@ -1676,10 +2731,48 @@ const initial = (n) => (n || "?")[0].toUpperCase();
 ───────────────────────────────────────────────────────── */
 export default function Chat({ authUser, authToken, onLogout }) {
   const [dark, setDark] = useState(true);
-  const [name, setName] = useState(authUser || "");
-  const [joined, setJoined] = useState(!!authUser);
+  const [name] = useState(authUser || "");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
+
+  // View routing
+  const [view, setView] = useState("channel"); // "channel" | "dm" | "room"
+  const [activeDmUser, setActiveDmUser] = useState(null);
+  const [dmMessages, setDmMessages] = useState({});
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [rooms, setRooms] = useState([]);
+  const [roomMessages, setRoomMessages] = useState({});
+  const [showCreateRoom, setShowCreateRoom] = useState(false);
+
+  // Users / profiles
+  const [allUsers, setAllUsers] = useState([]);
+  const [myProfile, setMyProfile] = useState(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [dmUnread, setDmUnread] = useState({});
+
+  const [friends, setFriends] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`friends_${authUser}`) || "[]"); } catch { return []; }
+  });
+  const [friendReqs, setFriendReqs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`friendreqs_${authUser}`) || "[]"); } catch { return []; }
+  });
+  const [showFriends, setShowFriends] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("account");
+  const [fontSize, setFontSize] = useState(() => localStorage.getItem("fontSize") || "medium");
+  const [bubbleStyle, setBubbleStyle] = useState(() => localStorage.getItem("bubbleStyle") || "rounded");
+  const [notifSound, setNotifSound] = useState(() => localStorage.getItem("notifSound") !== "false");
+  const [compactMode, setCompactMode] = useState(() => localStorage.getItem("compactMode") === "true");
+  const [privacyDm, setPrivacyDm] = useState(() => localStorage.getItem("privacyDm") || "everyone");
+  const [privacyFriend, setPrivacyFriend] = useState(() => localStorage.getItem("privacyFriend") || "everyone");
+
+  // Reactions
+  const [reactions, setReactions] = useState({});
+
+  // Edit
+  const [editingMsg, setEditingMsg] = useState(null);
+  const [editText, setEditText] = useState("");
+
   const [recording, setRecording] = useState(false);
   const [recordSecs, setRecordSecs] = useState(0);
   const [callMode, setCallMode] = useState(null);
@@ -1691,7 +2784,13 @@ export default function Chat({ authUser, authToken, onLogout }) {
   const typingTimeout = useRef(null);
   const [dragOver, setDragOver] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [showMsgSearch, setShowMsgSearch] = useState(false);
+  const [msgSearchQ, setMsgSearchQ] = useState("");
+  const [msgSearchIdx, setMsgSearchIdx] = useState(-1);
+  const [msgSearchResults, setMsgSearchResults] = useState([]);
   const emojiRef = useRef(null);
+  const msgRefs = useRef({});
 
   const stompClient = useRef(null);
   const messagesEnd = useRef(null);
@@ -1707,7 +2806,18 @@ export default function Chat({ authUser, authToken, onLogout }) {
   }, [name]);
 
   useEffect(() => {
-    if (authUser) connect();
+    if (authUser) {
+      connect();
+      // Load all users for DM list
+      fetch(`http://192.168.100.127:8080/auth/users`, { headers: { Authorization: `Bearer ${authToken}` } })
+        .then(r => r.json()).then(setAllUsers).catch(() => { });
+      // Load profile
+      fetch(`http://192.168.100.127:8080/auth/profile/${authUser}`, { headers: { Authorization: `Bearer ${authToken}` } })
+        .then(r => r.json()).then(setMyProfile).catch(() => { });
+      // Load rooms
+      fetch(`http://192.168.100.127:8080/rooms`, { headers: { Authorization: `Bearer ${authToken}` } })
+        .then(r => r.json()).then(setRooms).catch(() => { });
+    }
   }, []); // eslint-disable-line
 
   useEffect(() => {
@@ -1773,10 +2883,39 @@ export default function Chat({ authUser, authToken, onLogout }) {
           }
         });
 
-        client.subscribe("/topic/seen", (res) => {
-          const update = JSON.parse(res.body);
+        // DMs
+        client.subscribe(`/topic/dm.${name}`, (res) => {
+          const msg = JSON.parse(res.body);
+          const other = msg.sender === name ? msg.recipient : msg.sender;
+          setDmMessages(prev => {
+            const existing = prev[other] || [];
+            if (existing.some(m => m.id === msg.id)) return prev;
+            return { ...prev, [other]: [...existing, { ...msg, time: getTime() }] };
+          });
+          if (msg.sender !== name) {
+            setDmUnread(prev => ({ ...prev, [msg.sender]: (prev[msg.sender] || 0) + 1 }));
+          }
+        });
+
+        // Reactions
+        client.subscribe("/topic/reaction", (res) => {
+          const event = JSON.parse(res.body);
+          setReactions(prev => ({ ...prev, [event.messageId]: event.reactions || [] }));
+        });
+
+        // Edits
+        client.subscribe("/topic/edit", (res) => {
+          const event = JSON.parse(res.body);
           setMessages(prev => prev.map(m =>
-            m.id === update.messageId ? { ...m, status: "SEEN" } : m
+            m.id === event.messageId ? { ...m, content: event.newContent, edited: true } : m
+          ));
+        });
+
+        // Deletes
+        client.subscribe("/topic/delete", (res) => {
+          const event = JSON.parse(res.body);
+          setMessages(prev => prev.map(m =>
+            m.id === event.messageId ? { ...m, content: "This message was deleted.", deleted: true } : m
           ));
         });
       },
@@ -1787,23 +2926,85 @@ export default function Chat({ authUser, authToken, onLogout }) {
   };
 
   const sendMessage = () => {
+    // Commit edit
+    if (editingMsg) {
+      if (stompClient.current?.connected && editText.trim()) {
+        stompClient.current.publish({ destination: "/app/edit", body: JSON.stringify({ messageId: editingMsg.id, newContent: editText.trim(), editor: name }) });
+      }
+      setEditingMsg(null); setEditText(""); setMessage(""); return;
+    }
     clearTimeout(typingTimeout.current);
+    if (stompClient.current?.connected)
+      stompClient.current.publish({ destination: "/app/typing", body: JSON.stringify({ sender: nameRef.current, typing: false }) });
+    if (!stompClient.current?.connected || !message.trim()) return;
+
+    if (view === "dm" && activeDmUser) {
+      stompClient.current.publish({ destination: "/app/dm.send", body: JSON.stringify({ sender: name, recipient: activeDmUser, content: message.trim(), type: "TEXT" }) });
+    } else if (view === "room" && activeRoom) {
+      stompClient.current.publish({ destination: "/app/room.send", body: JSON.stringify({ roomId: activeRoom.id, sender: name, content: message.trim(), type: "TEXT" }) });
+    } else {
+      stompClient.current.publish({ destination: "/app/send", body: JSON.stringify({ sender: nameRef.current, content: message.trim() }) });
+    }
+    setMessage("");
+  };
+
+  /* ── DM / ROOM helpers ── */
+  const openDm = (user) => {
+    setActiveDmUser(user); setView("dm");
+    setDmUnread(prev => ({ ...prev, [user]: 0 }));
+    setMessage("");
+    fetch(`http://192.168.100.127:8080/dm/history?userA=${name}&userB=${user}`, { headers: { Authorization: `Bearer ${authToken}` } })
+      .then(r => r.json())
+      .then(data => setDmMessages(prev => ({ ...prev, [user]: data.map(m => ({ ...m, time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : getTime() })) })))
+      .catch(() => { });
+  };
+
+  const openRoom = (room) => {
+    setActiveRoom(room); setView("room"); setMessage("");
+    // Subscribe to room topic
     if (stompClient.current?.connected) {
-      stompClient.current.publish({
-        destination: "/app/typing",
-        body: JSON.stringify({ sender: nameRef.current, typing: false }),
+      stompClient.current.subscribe(`/topic/room.${room.id}`, (res) => {
+        const msg = JSON.parse(res.body);
+        setRoomMessages(prev => {
+          const existing = prev[room.id] || [];
+          if (existing.some(m => m.id === msg.id && msg.id)) return prev;
+          return { ...prev, [room.id]: [...existing, { ...msg, time: getTime() }] };
+        });
       });
     }
-    if (stompClient.current?.connected && message.trim()) {
-      stompClient.current.publish({
-        destination: "/app/send",
-        body: JSON.stringify({
-          sender: nameRef.current,
-          content: message.trim(),
-        }),
-      });
-      setMessage("");
-    }
+    fetch(`http://192.168.100.127:8080/rooms/${room.id}/history`, { headers: { Authorization: `Bearer ${authToken}` } })
+      .then(r => r.json())
+      .then(data => setRoomMessages(prev => ({ ...prev, [room.id]: data.map(m => ({ ...m, time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : getTime() })) })))
+      .catch(() => { });
+  };
+
+  const createRoom = async (roomName, desc) => {
+    try {
+      const res = await fetch(`http://192.168.100.127:8080/rooms`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ name: roomName, description: desc, createdBy: name }) });
+      const room = await res.json();
+      if (room.id) { setRooms(prev => [...prev, room]); setShowCreateRoom(false); openRoom(room); }
+    } catch { }
+  };
+
+  /* ── Reactions ── */
+  const sendReaction = (messageId, emoji) => {
+    if (!stompClient.current?.connected) return;
+    stompClient.current.publish({ destination: "/app/react", body: JSON.stringify({ messageId, username: name, emoji }) });
+  };
+
+  /* ── Edit / Delete ── */
+  const startEdit = (msg) => { setEditingMsg(msg); setEditText(msg.content); setMessage(msg.content); setTimeout(() => inputRef.current?.focus(), 50); };
+  const cancelEdit = () => { setEditingMsg(null); setEditText(""); setMessage(""); };
+  const deleteMessage = (msgId) => {
+    if (!stompClient.current?.connected) return;
+    stompClient.current.publish({ destination: "/app/delete", body: JSON.stringify({ messageId: msgId, deletedBy: name }) });
+  };
+
+  const getReactions = (msgId) => {
+    const list = reactions[msgId] || [];
+    const grouped = {};
+    list.forEach(r => { if (!grouped[r.emoji]) grouped[r.emoji] = { emoji: r.emoji, count: 0, users: [] }; grouped[r.emoji].count++; grouped[r.emoji].users.push(r.username); });
+    return Object.values(grouped);
   };
 
   /* ── UPLOAD ── */
@@ -1826,15 +3027,14 @@ export default function Chat({ authUser, authToken, onLogout }) {
         ? rawUrl
         : `${BASE_URL}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
 
-      stompClient.current.publish({
-        destination: "/app/send",
-        body: JSON.stringify({
-          sender: name,
-          content: file.name || "",
-          type,
-          fileUrl,
-        }),
-      });
+      const payload = { sender: name, content: file.name || "", type, fileUrl };
+      if (view === "dm" && activeDmUser) {
+        stompClient.current.publish({ destination: "/app/dm.send", body: JSON.stringify({ ...payload, recipient: activeDmUser }) });
+      } else if (view === "room" && activeRoom) {
+        stompClient.current.publish({ destination: "/app/room.send", body: JSON.stringify({ ...payload, roomId: activeRoom.id }) });
+      } else {
+        stompClient.current.publish({ destination: "/app/send", body: JSON.stringify(payload) });
+      }
     } catch (err) {
       alert("Upload failed — is the server running?\n" + err.message);
     }
@@ -1963,7 +3163,9 @@ export default function Chat({ authUser, authToken, onLogout }) {
     }
   };
   const handleInput = e => {
-    setMessage(e.target.value);
+    const val = e.target.value;
+    setMessage(val);
+    if (editingMsg) setEditText(val);
     e.target.style.height = "auto";
     e.target.style.height = Math.min(e.target.scrollHeight, 110) + "px";
 
@@ -2015,6 +3217,7 @@ export default function Chat({ authUser, authToken, onLogout }) {
 
   /* ── RENDER MESSAGE ── */
   const renderContent = (msg) => {
+    if (msg.deleted) return <span style={{ opacity: 0.6, fontStyle: "italic", fontSize: 13 }}>🚫 This message was deleted</span>;
     if (msg.type === "CALL") {
       return (
         <div
@@ -2081,27 +3284,76 @@ export default function Chat({ authUser, authToken, onLogout }) {
         <video controls src={resolveUrl(msg.fileUrl)} style={{ maxWidth: 280, maxHeight: 200, borderRadius: 14, display: "block", boxShadow: "0 5px 22px rgba(0,0,0,0.28)" }} />
       );
     }
-    return msg.content;
+    return <>{msg.content}{msg.edited && <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 5, fontStyle: "italic" }}>(edited)</span>}</>;
   };
 
   useEffect(() => () => stompClient.current?.deactivate(), []);
 
-  /* icon color for header/input buttons — dark vs light */
-  const IC = dark ? "#a080d0" : "#7c4fbf";
 
-  /* last preview for sidebar */
-  const lastMsg = messages.slice(-1)[0];
-  const lastPreview = !lastMsg
-    ? "No messages yet"
-    : lastMsg.type === "IMAGE"
-      ? "📷 Photo"
-      : lastMsg.type === "AUDIO"
-        ? "🎤 Voice message"
-        : lastMsg.type === "VIDEO"
-          ? "🎬 Video"
-          : lastMsg.type === "FILE"
-            ? "📎 File"
-            : lastMsg.content;
+
+  const currentMessages = view === "dm" && activeDmUser
+    ? (dmMessages[activeDmUser] || [])
+    : view === "room" && activeRoom
+      ? (roomMessages[activeRoom.id] || [])
+      : messages;
+
+  /* icon color for header/input buttons — dark vs light */
+  const saveFriends = (list) => {
+    setFriends(list);
+    localStorage.setItem(`friends_${authUser}`, JSON.stringify(list));
+  };
+  const saveReqs = (list) => {
+    setFriendReqs(list);
+    localStorage.setItem(`friendreqs_${authUser}`, JSON.stringify(list));
+  };
+  const sendFriendReq = (user) => {
+    if (friends.includes(user) || friendReqs.includes(user)) return;
+    const outKey = `friendreqs_out_${user}`;
+    const existing = JSON.parse(localStorage.getItem(outKey) || "[]");
+    if (!existing.includes(authUser)) {
+      localStorage.setItem(outKey, JSON.stringify([...existing, authUser]));
+    }
+    saveReqs([...friendReqs, user]);
+  };
+  const acceptFriendReq = (user) => {
+    saveFriends([...friends, user]);
+    const incoming = JSON.parse(localStorage.getItem(`friendreqs_out_${authUser}`) || "[]");
+    localStorage.setItem(`friendreqs_out_${authUser}`, JSON.stringify(incoming.filter(u => u !== user)));
+  };
+  const removeFriend = (user) => saveFriends(friends.filter(u => u !== user));
+  const incomingReqs = JSON.parse(localStorage.getItem(`friendreqs_out_${authUser}`) || "[]");
+  const IC = dark ? "#a080d0" : "#7c4fbf";
+  /* ── MESSAGE SEARCH ── */
+  const runMsgSearch = (q) => {
+    setMsgSearchQ(q);
+    if (!q.trim()) { setMsgSearchResults([]); setMsgSearchIdx(-1); return; }
+    const lower = q.toLowerCase();
+    const hits = currentMessages
+      .map((m, i) => ({ i, m }))
+      .filter(({ m }) => m.content && m.content.toLowerCase().includes(lower));
+    setMsgSearchResults(hits.map(h => h.i));
+    setMsgSearchIdx(hits.length > 0 ? hits.length - 1 : -1);
+    if (hits.length > 0) scrollToMsg(hits[hits.length - 1]);
+  };
+
+  const scrollToMsg = (idx) => {
+    const el = msgRefs.current[idx];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const searchNext = () => {
+    if (!msgSearchResults.length) return;
+    const next = msgSearchIdx <= 0 ? msgSearchResults.length - 1 : msgSearchIdx - 1;
+    setMsgSearchIdx(next);
+    scrollToMsg(msgSearchResults[next]);
+  };
+
+  const searchPrev = () => {
+    if (!msgSearchResults.length) return;
+    const prev = msgSearchIdx >= msgSearchResults.length - 1 ? 0 : msgSearchIdx + 1;
+    setMsgSearchIdx(prev);
+    scrollToMsg(msgSearchResults[prev]);
+  };
 
   useEffect(() => {
     if (!messages.length || !stompClient.current?.connected) return;
@@ -2167,7 +3419,6 @@ export default function Chat({ authUser, authToken, onLogout }) {
     <>
       <style>{buildCSS(dark)}</style>
       <BackgroundCanvas dark={dark} />
-      <ThemeToggle />
 
       {incomingCall && (
         <IncomingCallBanner
@@ -2181,63 +3432,172 @@ export default function Chat({ authUser, authToken, onLogout }) {
       <div className="page">
         <div className="chat-window">
           {/* ── SIDEBAR ── */}
-          <div className="sidebar">
-            <div className="sb-top">
-              <div className="sb-name">
-                {name}
-                <span className="sb-caret">▾</span>
-                <button
-                  onClick={onLogout}
-                  style={{
-                    marginLeft: "auto",
-                    background: "rgba(251,113,133,0.15)",
-                    border: "1px solid rgba(251,113,133,0.3)",
-                    borderRadius: 8,
-                    color: "#fb7185",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "3px 10px",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  Logout
+          <div className="sidebar" style={{
+            flexDirection: "column", background: "var(--glass2)", borderRight: "1px solid var(--divider)", width: 240, minWidth: 240, maxWidth: 240, flexShrink: 0, overflow: "hidden", transition: "width 0.2s",
+            display: (window.innerWidth < 640 && view !== "channel" && view !== "friends") ? "none" : "flex"
+          }}>
+
+            {/* ── App name + user row ── */}
+            <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid var(--divider)", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🌌</div>
+                <span style={{ fontWeight: 800, fontSize: 14, color: "var(--text)", letterSpacing: -0.3, flex: 1 }}>CosmoChat</span>
+                <button onClick={e => { e.stopPropagation(); setShowSettings(true); }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 15, padding: "2px 4px", opacity: 0.6 }} title="Settings">⚙️</button>
+              </div>
+
+              {/* Search */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--input-bg)", border: "1px solid var(--glass-border)", borderRadius: 8, padding: "6px 10px" }}>
+                <IcoSearch color={IC} size={13} />
+                <input placeholder="Find or start a convo..." value={searchQ} onChange={e => setSearchQ(e.target.value)}
+                  style={{ background: "transparent", border: "none", outline: "none", fontFamily: "inherit", fontSize: 12, color: "var(--text)", width: "100%" }} />
+              </div>
+            </div>
+
+            {/* ── Scrollable list ── */}
+            <div className="contact-list" style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
+
+              {/* Friends shortcut */}
+              <div onClick={() => { setView("friends"); setMessage(""); }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "friends" ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }}
+                onMouseEnter={e => { if (view !== "friends") e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }}
+                onMouseLeave={e => { if (view !== "friends") e.currentTarget.style.background = "transparent"; }}>
+                {view === "friends" && <div style={{ position: "absolute", left: 0, top: "20%", height: "60%", width: 3, background: "#a855f7", borderRadius: "0 3px 3px 0" }} />}
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>👥</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Friends</div>
+                </div>
+                {incomingReqs.length > 0 && <div style={{ minWidth: 18, height: 18, borderRadius: 999, background: "#fb7185", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{incomingReqs.length}</div>}
+              </div>
+
+              {/* Channels */}
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(168,85,247,0.5)", padding: "14px 10px 5px", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 8, opacity: 0.6 }}>✦</span> Channels
+              </div>
+              <div onClick={() => { setView("channel"); setMessage(""); }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "channel" ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }}
+                onMouseEnter={e => { if (view !== "channel") e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }}
+                onMouseLeave={e => { if (view !== "channel") e.currentTarget.style.background = "transparent"; }}>
+                {view === "channel" && <div style={{ position: "absolute", left: 0, top: "20%", height: "60%", width: 3, background: "#a855f7", borderRadius: "0 3px 3px 0" }} />}
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <IcoHash color="#a855f7" size={15} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Channel 1</div>
+                  <div style={{ fontSize: 11, color: "var(--text-sub)" }}>General chat</div>
+                </div>
+              </div>
+
+              {/* Rooms */}
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(168,85,247,0.5)", padding: "14px 10px 5px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 8, opacity: 0.6 }}>✦</span> Rooms</span>
+                <button onClick={() => setShowCreateRoom(true)} style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: 6, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+                  <IcoPlus color="#a855f7" size={11} />
                 </button>
               </div>
-              <div className="sb-search">
-                <IcoSearch color={IC} size={16} />
-                <input placeholder="Search" />
-              </div>
-            </div>
-            <div className="sb-section">
-              Online — {onlineUsers.length}
-            </div>
-            <div className="contact-list">
-              {onlineUsers.length === 0 ? (
-                <div style={{ padding: "12px 10px", fontSize: 12, color: "var(--text-muted)" }}>
-                  No users online
-                </div>
-              ) : onlineUsers.map((user, i) => (
-                <div key={i} className={`contact-item ${user === name ? "active" : ""}`}>
-                  <div className="c-av">
-                    {user[0].toUpperCase()}
-                    <div className="c-online" />
+              {rooms.map(room => (
+                <div key={room.id} onClick={() => openRoom(room)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "room" && activeRoom?.id === room.id ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }}
+                  onMouseEnter={e => { if (!(view === "room" && activeRoom?.id === room.id)) e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }}
+                  onMouseLeave={e => { if (!(view === "room" && activeRoom?.id === room.id)) e.currentTarget.style.background = "transparent"; }}>
+                  {view === "room" && activeRoom?.id === room.id && <div style={{ position: "absolute", left: 0, top: "20%", height: "60%", width: 3, background: "#a855f7", borderRadius: "0 3px 3px 0" }} />}
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: `linear-gradient(135deg,${["#7c3aed", "#06b6d4", "#ec4899", "#059669", "#f59e0b"][room.id % 5]},${["#a855f7", "#7c3aed", "#a855f7", "#06b6d4", "#ec4899"][room.id % 5]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
+                    {room.emoji || "🌟"}
                   </div>
-                  <div className="c-info">
-                    <div className="c-name">{user} {user === name ? "(you)" : ""}</div>
-                    <div className="c-last">
-                      {typingUsers.includes(user) ? "✍️ typing..." : "Online"}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{room.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-sub)" }}>{room.description || "Room"}</div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Direct Messages */}
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(168,85,247,0.5)", padding: "14px 10px 5px", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 8, opacity: 0.6 }}>✦</span> Direct Messages
+              </div>
+              {friends.filter(u => u !== name && (!searchQ || u.toLowerCase().includes(searchQ.toLowerCase()))).map((user, i) => {
+                const gradients = ["linear-gradient(135deg,#7c3aed,#a855f7)", "linear-gradient(135deg,#06b6d4,#7c3aed)", "linear-gradient(135deg,#ec4899,#a855f7)", "linear-gradient(135deg,#059669,#06b6d4)", "linear-gradient(135deg,#f59e0b,#ec4899)"];
+                const grad = gradients[user.charCodeAt(0) % gradients.length];
+                return (
+                  <div key={i} onClick={() => openDm(user)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "dm" && activeDmUser === user ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }}
+                    onMouseEnter={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }}
+                    onMouseLeave={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "transparent"; }}>
+                    {view === "dm" && activeDmUser === user && <div style={{ position: "absolute", left: 0, top: "20%", height: "60%", width: 3, background: "#a855f7", borderRadius: "0 3px 3px 0" }} />}
+                    <div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: grad, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+                      {user[0].toUpperCase()}
+                      <div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: onlineUsers.includes(user) ? "#10b981" : "rgba(255,255,255,0.2)", border: "2px solid var(--glass2)", boxShadow: onlineUsers.includes(user) ? "0 0 5px #10b981" : "none" }} />
                     </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user}</div>
+                      <div style={{ fontSize: 11, color: onlineUsers.includes(user) ? "#10b981" : "var(--text-sub)" }}>{onlineUsers.includes(user) ? "● Active" : "○ Offline"}</div>
+                    </div>
+                    {dmUnread[user] > 0 && <div style={{ minWidth: 18, height: 18, borderRadius: 999, background: "#a855f7", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{dmUnread[user]}</div>}
+                  </div>
+                );
+              })}
+
+              {/* Online now */}
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(168,85,247,0.5)", padding: "14px 10px 5px", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 8, opacity: 0.6 }}>✦</span> Online — {onlineUsers.length}
+              </div>
+              {onlineUsers.map((user, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, marginBottom: 2 }}>
+                  <div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+                    {user[0].toUpperCase()}
+                    <div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: "#10b981", border: "2px solid var(--glass2)", boxShadow: "0 0 5px #10b981" }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user}{user === name ? " (you)" : ""}</div>
+                    <div style={{ fontSize: 11, color: "#10b981" }}>{typingUsers.includes(user) ? "✍️ typing…" : "● Active"}</div>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* ── Bottom user bar ── */}
+            <div style={{ padding: "10px 12px", borderTop: "1px solid var(--divider)", display: "flex", alignItems: "center", gap: 9, flexShrink: 0, background: "var(--glass2)" }}>
+              <div onClick={() => setShowProfile(true)} style={{ position: "relative", width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0, overflow: "hidden" }}>
+                {myProfile?.avatarUrl
+                  ? <img
+                    src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`}
+                    alt=""
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={e => { e.target.style.display = "none"; }}
+                  />
+                  : name[0]?.toUpperCase()}
+                <div style={{ position: "absolute", bottom: 1, right: 1, width: 9, height: 9, borderRadius: "50%", background: "#10b981", border: "2px solid var(--glass2)", boxShadow: "0 0 5px #10b981" }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => setShowProfile(true)}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{myProfile?.displayName || name}</div>
+                <div style={{ fontSize: 11, color: "#10b981" }}>● Online</div>
+              </div>
+              <button onClick={e => { e.stopPropagation(); setShowSettings(true); }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 15, padding: "3px", opacity: 0.6, borderRadius: 6 }} title="Settings">⚙️</button>
+              <button onClick={e => { e.stopPropagation(); onLogout(); }} style={{ background: "rgba(251,113,133,0.12)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 8, color: "#fb7185", fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}>Out</button>
+            </div>
+
           </div>
 
+          {/* ── FRIENDS PAGE ── */}
+          {view === "friends" && (
+            <FriendsPage
+              allUsers={allUsers}
+              onlineUsers={onlineUsers}
+              friends={friends}
+              friendReqs={friendReqs}
+              incomingReqs={incomingReqs}
+              onSendReq={sendFriendReq}
+              onAccept={acceptFriendReq}
+              onRemove={removeFriend}
+              onDm={(user) => { openDm(user); }}
+              name={name}
+            />
+          )}
+
           {/* ── CHAT PANEL ── */}
-          <div
+          {view !== "friends" && <div
             className="chat-panel"
             onDragOver={handleDragOver}
+            style={{ display: (window.innerWidth < 640 && view === "channel") ? "none" : "flex", flex: 1, flexDirection: "column", overflow: "hidden", minWidth: 0, position: "relative" }}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
@@ -2264,12 +3624,19 @@ export default function Chat({ authUser, authToken, onLogout }) {
             )}
             {/* Header */}
             <div className="chat-hdr">
-              <div className="h-av">C</div>
+              {(view === "dm" || view === "room") && (
+                <button className="h-btn" onClick={() => { setView("channel"); setMessage(""); }} style={{ marginRight: 4 }}>
+                  <IcoBack color={IC} size={18} />
+                </button>
+              )}
+              <div className="h-av">
+                {view === "room" ? <IcoHash color="#fff" size={16} /> : (view === "dm" ? activeDmUser?.[0]?.toUpperCase() : "C")}
+              </div>
               <div className="h-info">
-                <div className="h-name">Channel 1</div>
+                <div className="h-name">{view === "dm" ? activeDmUser : view === "room" ? `# ${activeRoom?.name}` : "Channel 1"}</div>
                 <div className="h-status">
-                  <span className="h-dot" />
-                  Active now
+                  {(view === "channel" || (view === "dm" && onlineUsers.includes(activeDmUser))) && <span className="h-dot" />}
+                  {view === "dm" ? (onlineUsers.includes(activeDmUser) ? "Online" : "Offline") : view === "room" ? (activeRoom?.description || "Room") : "Active now"}
                 </div>
               </div>
               <div className="h-actions">
@@ -2287,47 +3654,90 @@ export default function Chat({ authUser, authToken, onLogout }) {
                 >
                   <IcoVideo color={IC} size={19} />
                 </button>
+                <button className="h-btn" title="Search messages" onClick={() => { setShowMsgSearch(v => !v); setMsgSearchQ(""); setMsgSearchResults([]); setMsgSearchIdx(-1); }}>
+                  <IcoSearch color={IC} size={17} />
+                </button>
                 <button className="h-btn" title="Info">
                   <IcoInfo color={IC} size={19} />
                 </button>
               </div>
             </div>
 
+
+
+            {/* Message search bar */}
+            {showMsgSearch && (
+              <div className="msg-search-bar">
+                <input
+                  className="msg-search-input"
+                  placeholder="Search messages…"
+                  value={msgSearchQ}
+                  onChange={e => runMsgSearch(e.target.value)}
+                  autoFocus
+                />
+                <div className="msg-search-nav">
+                  <button className="msg-search-btn" onClick={searchPrev} title="Previous">▲</button>
+                  <span className="msg-search-count">
+                    {msgSearchResults.length === 0 ? "0/0" : `${msgSearchResults.length - msgSearchIdx}/${msgSearchResults.length}`}
+                  </span>
+                  <button className="msg-search-btn" onClick={searchNext} title="Next">▼</button>
+                </div>
+                <button className="msg-search-btn" onClick={() => { setShowMsgSearch(false); setMsgSearchQ(""); setMsgSearchResults([]); setMsgSearchIdx(-1); }}>✕</button>
+              </div>
+            )}
+
             {/* Messages */}
             <div className="msgs">
-              {messages.length === 0 ? (
+              {currentMessages.length === 0 ? (
                 <div className="empty-wrap">
-                  <div className="empty-av">C</div>
-                  <div className="empty-name">Channel 1</div>
-                  <div className="empty-hint">
-                    No messages yet — say something! 👋
+                  <div className="empty-av">
+                    {view === "room" ? "#" : view === "dm" ? activeDmUser?.[0]?.toUpperCase() : "C"}
                   </div>
+                  <div className="empty-name">
+                    {view === "dm" ? activeDmUser : view === "room" ? `# ${activeRoom?.name}` : "Channel 1"}
+                  </div>
+                  <div className="empty-hint">No messages yet — say something! 👋</div>
                 </div>
               ) : (
-                messages.map((msg, i) => {
+                currentMessages.map((msg, i) => {
                   const me = msg.sender === name;
+                  const msgReactions = getReactions(msg.id);
+                  const isSearchHit = msgSearchResults.includes(i);
+                  const isActiveHit = msgSearchResults[msgSearchIdx] === i;
                   return (
-                    <div key={i} className={`msg-group ${me ? "me" : "other"}`}>
+                    <div key={i} ref={el => msgRefs.current[i] = el} className={`msg-group ${me ? "me" : "other"}`}
+                      style={isActiveHit ? { outline: "2px solid var(--accent)", borderRadius: 14, outlineOffset: 2 } : isSearchHit ? { outline: "1px solid rgba(196,109,255,0.4)", borderRadius: 14, outlineOffset: 2 } : {}}>
                       {!me && <div className="msg-sender">{msg.sender}</div>}
                       <div className="msg-row">
-                        {!me && (
-                          <div className="mini-av">{initial(msg.sender)}</div>
-                        )}
-                        <div
-                          className={`msg-bubble${msg.type === "IMAGE" ? " is-image" : ""}`}
-                        >
+                        {!me && <div className="mini-av">{initial(msg.sender)}</div>}
+                        <div className={`msg-bubble${msg.type === "IMAGE" ? " is-image" : ""}${msg.deleted ? " deleted" : ""}`}>
                           {renderContent(msg)}
+                          {/* Hover action buttons */}
+                          {!msg.deleted && (
+                            <div className="msg-actions">
+                              <button className="action-btn" title="React" onClick={() => sendReaction(msg.id, "❤️")}><span style={{ fontSize: 13 }}>❤️</span></button>
+                              <button className="action-btn" title="React 👍" onClick={() => sendReaction(msg.id, "👍")}><span style={{ fontSize: 13 }}>👍</span></button>
+                              {me && !msg.deleted && <button className="action-btn" title="Edit" onClick={() => startEdit(msg)}><IcoEdit color={IC} size={14} /></button>}
+                              {me && !msg.deleted && <button className="action-btn" title="Delete" onClick={() => deleteMessage(msg.id)}><IcoTrash size={14} /></button>}
+                            </div>
+                          )}
                         </div>
                       </div>
+                      {/* Reactions */}
+                      {msgReactions.length > 0 && (
+                        <div className="reactions-row" style={{ paddingLeft: me ? 0 : 34 }}>
+                          {msgReactions.map((r, ri) => (
+                            <button key={ri} className={`reaction-chip${r.users.includes(name) ? " mine" : ""}`} onClick={() => sendReaction(msg.id, r.emoji)} title={r.users.join(", ")}>
+                              {r.emoji}<span className="reaction-count">{r.count}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       <div className="msg-time">
                         {msg.time}
-                        {msg.sender === name && (
+                        {me && view === "channel" && (
                           <span style={{ marginLeft: 5, fontSize: 11 }}>
-                            {msg.status === "SEEN"
-                              ? <span style={{ color: "#60a5fa" }}>✓✓</span>
-                              : msg.status === "DELIVERED"
-                                ? <span style={{ color: "var(--text-muted)" }}>✓✓</span>
-                                : <span style={{ color: "var(--text-muted)" }}>✓</span>}
+                            {msg.status === "SEEN" ? <span style={{ color: "#60a5fa" }}>✓✓</span> : msg.status === "DELIVERED" ? <span style={{ color: "var(--text-muted)" }}>✓✓</span> : <span style={{ color: "var(--text-muted)" }}>✓</span>}
                           </span>
                         )}
                       </div>
@@ -2366,6 +3776,12 @@ export default function Chat({ authUser, authToken, onLogout }) {
 
             {/* Input */}
             <div className="input-area" style={{ position: "relative" }}>
+              {editingMsg && (
+                <div className="edit-bar">
+                  ✏️ Editing message
+                  <button onClick={cancelEdit}>✕ Cancel</button>
+                </div>
+              )}
               <div className="input-row">
                 <textarea
                   ref={inputRef}
@@ -2435,8 +3851,8 @@ export default function Chat({ authUser, authToken, onLogout }) {
                 <EmojiPicker onSelect={insertEmoji} emojiRef={emojiRef} />
               )}
             </div>
-          </div>
-        <input
+          </div>}
+          <input
             type="file"
             accept="image/*"
             ref={imageInputRef}
@@ -2458,6 +3874,37 @@ export default function Chat({ authUser, authToken, onLogout }) {
           />
         </div>
       </div>
+
+
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          tab={settingsTab}
+          setTab={setSettingsTab}
+          dark={dark}
+          setDark={setDark}
+          authToken={authToken}
+          authUser={authUser}
+          myProfile={myProfile}
+          onUpdateProfile={(data) => setMyProfile(prev => ({ ...prev, ...data }))}
+          fontSize={fontSize}
+          setFontSize={(v) => { setFontSize(v); localStorage.setItem("fontSize", v); }}
+          bubbleStyle={bubbleStyle}
+          setBubbleStyle={(v) => { setBubbleStyle(v); localStorage.setItem("bubbleStyle", v); }}
+          notifSound={notifSound}
+          setNotifSound={(v) => { setNotifSound(v); localStorage.setItem("notifSound", String(v)); }}
+          compactMode={compactMode}
+          setCompactMode={(v) => { setCompactMode(v); localStorage.setItem("compactMode", String(v)); }}
+          privacyDm={privacyDm}
+          setPrivacyDm={(v) => { setPrivacyDm(v); localStorage.setItem("privacyDm", v); }}
+          privacyFriend={privacyFriend}
+          setPrivacyFriend={(v) => { setPrivacyFriend(v); localStorage.setItem("privacyFriend", v); }}
+          onLogout={onLogout}
+        />
+      )}
+
+      {showCreateRoom && <CreateRoomModal onClose={() => setShowCreateRoom(false)} onCreate={createRoom} />}
+      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} authToken={authToken} user={{ ...myProfile, username: name }} onUpdate={(data) => setMyProfile(prev => ({ ...prev, ...data }))} />}
     </>
   );
 }

@@ -33,12 +33,14 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**").permitAll()
-                .requestMatchers("/ws/**").permitAll()
-                .requestMatchers("/upload/**").permitAll()
-                .requestMatchers("/uploads/**").permitAll()
-                .anyRequest().authenticated()
-            )
+            .requestMatchers("/auth/**").permitAll()
+            .requestMatchers("/ws/**").permitAll()
+            .requestMatchers("/upload/**").permitAll()
+            .requestMatchers("/uploads/**").permitAll()
+            .requestMatchers("/dm/**").permitAll()
+            .requestMatchers("/rooms/**").permitAll()
+            .anyRequest().authenticated()
+)
             .addFilterBefore(jwtAuthFilter,
                     UsernamePasswordAuthenticationFilter.class);
 
