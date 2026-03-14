@@ -600,7 +600,7 @@ function ChatMockup() {
         <div className="mockup-dot" style={{ background: "#ff5f57" }} />
         <div className="mockup-dot" style={{ background: "#febc2e" }} />
         <div className="mockup-dot" style={{ background: "#28c840" }} />
-        <div className="mockup-title">nexus.chat — Channel 1</div>
+        <div className="mockup-title">CosmoChat — Channel 1</div>
       </div>
       <div className="mockup-body">
         <div className="mockup-sidebar">
@@ -655,7 +655,7 @@ function AuthModal({ dark, initialMode, onClose, onAuth }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
-  const [email,    setEmail]    = useState("");
+  const [email, setEmail] = useState("");
 
   const reset = () => { setError(""); setSuccess(""); setPassword(""); setConfirm(""); };
   const switchMode = (m) => { setMode(m); reset(); };
@@ -701,7 +701,7 @@ function AuthModal({ dark, initialMode, onClose, onAuth }) {
     <div className="auth-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="auth-modal">
         <button className="auth-close" onClick={onClose}>✕</button>
-        <div className="auth-logo-wrap">💬</div>
+        <div className="auth-logo-wrap">🌌</div>
         <h2 className="auth-title">{mode === "login" ? "Welcome back" : "Join CosmoChat"}</h2>
         <p className="auth-sub">
           {mode === "login" ? "Sign in to continue your conversations" : "Create your free account and start chatting"}
@@ -825,7 +825,7 @@ export default function App() {
       {/* NAV */}
       <nav className="nav">
         <div className="nav-logo">
-          <div className="nav-logo-icon">💬</div>
+          <div className="nav-logo-icon">🌌</div>
           CosmoChat
         </div>
         <div className="nav-spacer" />
@@ -939,7 +939,7 @@ export default function App() {
         {/* CTA */}
         <section className="cta-section">
           <div className="cta-card">
-            <div style={{ fontSize: 48, marginBottom: 20 }}>💬</div>
+            <div style={{ fontSize: 48, marginBottom: 20 }}>🌌</div>
             <h2 className="cta-title">Ready to start the conversation?</h2>
             <p className="cta-sub">Join CosmoChat today. Free, fast, and beautiful on every device.</p>
             <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
@@ -952,7 +952,7 @@ export default function App() {
         {/* FOOTER */}
         <footer className="footer">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="nav-logo-icon" style={{ width: 28, height: 28, fontSize: 14 }}>💬</div>
+            <div className="nav-logo-icon" style={{ width: 28, height: 28, fontSize: 14 }}>🌌</div>
             <span className="footer-copy">© 2026 CosmoChat. Built with ❤️ and WebSockets.</span>
           </div>
           <div className="footer-links">
