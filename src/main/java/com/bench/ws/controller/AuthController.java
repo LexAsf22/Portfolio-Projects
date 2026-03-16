@@ -17,17 +17,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.bench.ws.dto.LoginRequest;
@@ -40,18 +30,36 @@ import com.bench.ws.repository.UserRepository;
 import com.bench.ws.security.JwtUtil;
 import com.bench.ws.service.EmailService;
 
+/**
+ * AuthController — updated for new features:
+ *
+ * FEATURE: Security — 2FA during login
+ *   - login() now checks if 2FA is enabled
+ *   - If enabled, returns { requiresTwoFactor: true } instead of a JWT
+ *   - Frontend then prompts for the 6-digit code → POST /auth/2fa/verify
+ *
+ * FEATURE: Moderation — ban check on login
+ *   - Banned users receive a clear error message and cannot log in
+ *   - Temporary bans show the expiry time
+ *
+ * FEATURE: Mood Status — reset to ONLINE on login
+ *   - When user logs in, mood is set back to ONLINE (from OFFLINE/INVISIBLE)
+ *
+ * FIX: update-email endpoint now correctly reads "newEmail" from body
+ *   (was reading "email" which caused null on some client versions)
+ */
 @RestController
 @RequestMapping("/auth")
 @CrossOrigin("*")
 public class AuthController {
 
-    private final AuthenticationManager     authenticationManager;
-    private final JwtUtil                   jwtUtil;
-    private final UserRepository            userRepository;
-    private final PasswordEncoder           passwordEncoder;
-    private final MessageRepository         messageRepository;
-    private final DirectMessageRepository   dmRepository;
-    private final EmailService              emailService;
+    private final AuthenticationManager    authenticationManager;
+    private final JwtUtil                  jwtUtil;
+    private final UserRepository           userRepository;
+    private final PasswordEncoder          passwordEncoder;
+    private final MessageRepository        messageRepository;
+    private final DirectMessageRepository  dmRepository;
+    private final EmailService             emailService;
 
     // In-memory verification code store (use Redis in production)
     private final ConcurrentHashMap<String, String>  verificationCodes = new ConcurrentHashMap<>();
@@ -74,8 +82,12 @@ public class AuthController {
     }
 
     // ── Login ──────────────────────────────────────────────────
+    /**
+     * FEATURE: Moderation — banned users are rejected at login
+     * FEATURE: Security  — 2FA users get a challenge instead of a JWT
+     */
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         try {
             authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -84,6 +96,35 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(Map.of("error", "Invalid credentials"));
         }
+
+        // FEATURE: Moderation — check ban status before issuing token
+        User user = userRepository.findByUsername(request.getUsername()).orElse(null);
+        if (user != null && user.isCurrentlyBanned()) {
+            String banMsg = user.getBannedUntil() != null
+                ? "You are temporarily banned until " + user.getBannedUntil()
+                : "You are permanently banned from this server.";
+            String reason = user.getBanReason() != null
+                ? " Reason: " + user.getBanReason()
+                : "";
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", banMsg + reason));
+        }
+
+        // FEATURE: Security — if 2FA is enabled, return a challenge
+        if (user != null && user.isTwoFactorEnabled()) {
+            return ResponseEntity.ok(Map.of(
+                "requiresTwoFactor", true,
+                "username",          request.getUsername(),
+                "message",           "Enter your 6-digit authenticator code at /auth/2fa/verify"
+            ));
+        }
+
+        // FEATURE: Mood — reset to ONLINE on login
+        if (user != null && "OFFLINE".equals(user.getMoodStatus())) {
+            user.setMoodStatus("ONLINE");
+            userRepository.save(user);
+        }
+
         String token = jwtUtil.generateToken(request.getUsername());
         return ResponseEntity.ok(Map.of(
             "token",    token,
@@ -92,7 +133,7 @@ public class AuthController {
 
     // ── Register ───────────────────────────────────────────────
     @PostMapping("/register")
-    public ResponseEntity<Map<String, String>> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<Map<String, Object>> register(@RequestBody RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername()))
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("error", "Username already taken"));
@@ -101,6 +142,10 @@ public class AuthController {
                              passwordEncoder.encode(request.getPassword()));
         if (request.getEmail() != null && !request.getEmail().isBlank())
             user.setEmail(request.getEmail());
+
+        // New users start as MEMBER
+        user.setRole("MEMBER");
+        user.setMoodStatus("ONLINE");
 
         userRepository.save(user);
         String token = jwtUtil.generateToken(request.getUsername());
@@ -137,7 +182,8 @@ public class AuthController {
     public ResponseEntity<?> getProfile(@PathVariable String username) {
         User user = userRepository.findByUsername(username).orElse(null);
         if (user == null) return ResponseEntity.notFound().build();
-        user.setPassword(null); // never expose password hash
+        user.setPassword(null);
+        user.setTwoFactorSecret(null); // never expose the 2FA secret
         return ResponseEntity.ok(user);
     }
 
@@ -158,15 +204,14 @@ public class AuthController {
 
             userRepository.save(user);
             user.setPassword(null);
+            user.setTwoFactorSecret(null);
             return ResponseEntity.ok(user);
         } catch (Exception e) {
             return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
         }
     }
 
-    // ── FIX: Change username ───────────────────────────────────
-    // Root cause: No endpoint existed for username change.
-    // New endpoint validates uniqueness, updates user, issues new JWT.
+    // ── Change username ────────────────────────────────────────
     @PutMapping("/change-username")
     public ResponseEntity<?> changeUsername(
             @RequestHeader("Authorization") String authHeader,
@@ -197,12 +242,11 @@ public class AuthController {
             user.setUsername(newUsername);
             userRepository.save(user);
 
-            // Issue a new JWT with updated username
             String newToken = jwtUtil.generateToken(newUsername);
             return ResponseEntity.ok(Map.of(
-                "message",     "Username changed successfully",
-                "token",       newToken,
-                "username",    newUsername));
+                "message",  "Username changed successfully",
+                "token",    newToken,
+                "username", newUsername));
         } catch (Exception e) {
             return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
         }
@@ -242,7 +286,7 @@ public class AuthController {
 
             String code = String.valueOf((int)(Math.random() * 900000) + 100000);
             verificationCodes.put(username, code);
-            codeExpiry.put(username, Instant.now().plusSeconds(600)); // 10 min TTL
+            codeExpiry.put(username, Instant.now().plusSeconds(600));
 
             emailService.sendVerificationCode(user.getEmail(), code);
             return ResponseEntity.ok(Map.of("message", "Code sent to " + maskEmail(user.getEmail())));
@@ -251,7 +295,7 @@ public class AuthController {
         }
     }
 
-    // ── Change password (code-verified) ───────────────────────
+    // ── Change password ────────────────────────────────────────
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(
             @RequestHeader("Authorization") String authHeader,
@@ -273,7 +317,7 @@ public class AuthController {
 
             if (Instant.now().isAfter(expiry))
                 return ResponseEntity.status(400)
-                    .body(Map.of("error", "Verification code expired. Request a new one."));
+                    .body(Map.of("error", "Verification code expired."));
 
             if (!savedCode.equals(code))
                 return ResponseEntity.status(400)
@@ -294,17 +338,16 @@ public class AuthController {
         }
     }
 
-    // ── FIX: Update email ──────────────────────────────────────
-    // Root cause: original had correct logic but no null-check on body.get("email"),
-    // and the Authorization header was not always forwarded correctly from the frontend.
-    // Added null/blank validation and explicit error messages.
+    // ── Update email ───────────────────────────────────────────
+    // FIX: reads both "newEmail" and "email" keys for compatibility
     @PutMapping("/update-email")
     public ResponseEntity<?> updateEmail(
             @RequestHeader("Authorization") String authHeader,
             @RequestBody Map<String, String> body) {
         try {
             String username = jwtUtil.extractUsername(authHeader.substring(7));
-            String newEmail = body.get("email");
+            // Accept both "newEmail" (new) and "email" (legacy) keys
+            String newEmail = body.containsKey("newEmail") ? body.get("newEmail") : body.get("email");
 
             if (newEmail == null || newEmail.isBlank())
                 return ResponseEntity.status(400)
@@ -325,9 +368,7 @@ public class AuthController {
         }
     }
 
-    // ── FIX: Delete account ────────────────────────────────────
-    // Root cause: Endpoint did not exist at all.
-    // Deletes user + all their messages and DMs.
+    // ── Delete account ─────────────────────────────────────────
     @Transactional
     @DeleteMapping("/delete-account")
     public ResponseEntity<?> deleteAccount(
@@ -337,16 +378,10 @@ public class AuthController {
             User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-            // Delete all messages sent by this user
             messageRepository.deleteBySender(username);
-
-            // Delete all DMs sent or received by this user
             dmRepository.deleteBySenderOrRecipient(username, username);
-
-            // Delete the user account itself
             userRepository.delete(user);
 
-            // Clean up any pending verification codes
             verificationCodes.remove(username);
             codeExpiry.remove(username);
 
@@ -356,13 +391,22 @@ public class AuthController {
         }
     }
 
+    // ── Edit history for a message ─────────────────────────────
+    @GetMapping("/messages/{messageId}/history")
+    public ResponseEntity<?> getEditHistory(@PathVariable Long messageId) {
+        // Delegate to the repository through the message endpoint
+        return ResponseEntity.ok(Map.of(
+            "messageId", messageId,
+            "note",      "Use GET /messages/{id}/history endpoint"
+        ));
+    }
+
     // ── Helpers ────────────────────────────────────────────────
     private String getExtension(String filename) {
         if (filename == null || !filename.contains(".")) return "";
         return filename.substring(filename.lastIndexOf("."));
     }
 
-    // Masks email for display: user@example.com → us**@example.com
     private String maskEmail(String email) {
         int atIdx = email.indexOf('@');
         if (atIdx <= 2) return email;

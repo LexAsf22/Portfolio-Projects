@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 
-const BASE_URL = "http://192.168.100.127:8080";
+const BASE_URL = "http://192.168.108.132:8080";
 
 export default function AuthModal({ dark, initialMode, onClose, onAuth }) {
   const [mode,     setMode]     = useState(initialMode || "login");
