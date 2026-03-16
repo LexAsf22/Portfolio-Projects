@@ -236,78 +236,408 @@ function BackgroundCanvas({ dark }) {
    CALL OVERLAY
 ───────────────────────────────────────────────────────── */
 function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
-  const peersRef = useRef({}); const streamsRef = useRef({}); const [remoteStreams, setRemoteStreams] = useState({}); const localStream = useRef(null); const signalSub = useRef(null); const localRef = useRef(null);
-  const [muted, setMuted] = useState(false); const [camOff, setCamOff] = useState(false); const [screenSharing, setScreenSharing] = useState(false); const [screenStream, setScreenStream] = useState(null); const [status, setStatus] = useState("Connecting…"); const [secs, setSecs] = useState(0); const [activeSpeaker, setActiveSpeaker] = useState(null);
-  const durTimer = useRef(null); const endTimeout = useRef(null);
+  const peersRef       = useRef({});
+  const streamsRef     = useRef({});
+  const screenPeers    = useRef({});      // separate PeerConnections for screen share
+  const [remoteStreams, setRemoteStreams] = useState({});
+  const [remoteScreenStreams, setRemoteScreenStreams] = useState({});
+  const localStream    = useRef(null);
+  const screenStream   = useRef(null);    // getDisplayMedia stream
+  const signalSub      = useRef(null);
+  const localRef       = useRef(null);
+  const localScreenRef = useRef(null);    // preview of own screen share
+  const [muted,         setMuted]         = useState(false);
+  const [camOff,        setCamOff]        = useState(false);
+  const [sharing,       setSharing]       = useState(false);  // is this user sharing screen?
+  const [status,        setStatus]        = useState("Connecting…");
+  const [secs,          setSecs]          = useState(0);
+  const [activeSpeaker, setActiveSpeaker] = useState(null);
+  const durTimer   = useRef(null);
+  const endTimeout = useRef(null);
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-  const ICE_CONFIG = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }, { urls: "stun:stun2.l.google.com:19302" }, { urls: "stun:stun3.l.google.com:19302" }, { urls: "stun:stun4.l.google.com:19302" }, { urls: "stun:stun.relay.metered.ca:80" }, { urls: "turn:standard.relay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" }, { urls: "turn:standard.relay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" }, { urls: "turn:standard.relay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }], iceTransportPolicy: "all", iceCandidatePoolSize: 10 };
-  const publish = (payload) => { if (stompClient?.current?.connected) { stompClient.current.publish({ destination: "/app/call-signal", body: JSON.stringify(payload) }); } };
+
+  const ICE_CONFIG = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:stun.relay.metered.ca:80" },
+      { urls: "turn:standard.relay.metered.ca:80",  username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:standard.relay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:standard.relay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+    ],
+    iceTransportPolicy: "all",
+    iceCandidatePoolSize: 10,
+  };
+
+  const publish = (payload) => {
+    if (stompClient?.current?.connected)
+      stompClient.current.publish({ destination: "/app/call-signal", body: JSON.stringify(payload) });
+  };
+
+  // ── Create / get a peer connection for camera/mic ──────────
   const createPeer = (peerId, asInitiator) => {
     if (peersRef.current[peerId]?.pc) return peersRef.current[peerId].pc;
     const pc = new RTCPeerConnection(ICE_CONFIG);
     peersRef.current[peerId] = { pc, makingOffer: false, offerProcessing: false, answerSent: false, pendingCandidates: [], remoteDescSet: false };
-    if (localStream.current) { localStream.current.getTracks().forEach(t => pc.addTrack(t, localStream.current)); }
-    pc.ontrack = (e) => { if (!e.streams[0]) return; streamsRef.current[peerId] = e.streams[0]; setRemoteStreams(prev => ({ ...prev, [peerId]: e.streams[0] })); setStatus("Connected"); if (!durTimer.current) { durTimer.current = setInterval(() => setSecs(s => s + 1), 1000); } try { const ctx = new AudioContext(); const src = ctx.createMediaStreamSource(e.streams[0]); const analyser = ctx.createAnalyser(); analyser.fftSize = 256; src.connect(analyser); const data = new Uint8Array(analyser.frequencyBinCount); const check = () => { analyser.getByteFrequencyData(data); const vol = data.reduce((a, b) => a + b, 0) / data.length; if (vol > 18) setActiveSpeaker(peerId); requestAnimationFrame(check); }; check(); } catch (_) {} };
-    pc.onicecandidate = (e) => { if (e.candidate) { publish({ sender: myName, target: peerId, type: "ICE", callRoom: "channel1", payload: JSON.stringify(e.candidate) }); } };
-    pc.oniceconnectionstatechange = () => { if (pc.iceConnectionState === "disconnected") { clearTimeout(endTimeout.current); endTimeout.current = setTimeout(() => { if (["disconnected", "failed"].includes(pc.iceConnectionState)) { removePeer(peerId); } }, 8000); if (asInitiator) pc.restartIce(); } else if (pc.iceConnectionState === "failed") { if (asInitiator) { pc.restartIce(); } else { removePeer(peerId); } } else if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") { clearTimeout(endTimeout.current); } };
-    if (asInitiator) { (async () => { try { peersRef.current[peerId].makingOffer = true; const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: mode === "video" }); await pc.setLocalDescription(offer); publish({ sender: myName, target: peerId, type: "OFFER", callRoom: "channel1", payload: JSON.stringify(offer) }); } catch (err) { console.error("createOffer error:", err); } finally { if (peersRef.current[peerId]) peersRef.current[peerId].makingOffer = false; } })(); }
+
+    if (localStream.current)
+      localStream.current.getTracks().forEach(t => pc.addTrack(t, localStream.current));
+
+    pc.ontrack = (e) => {
+      if (!e.streams[0]) return;
+      streamsRef.current[peerId] = e.streams[0];
+      setRemoteStreams(prev => ({ ...prev, [peerId]: e.streams[0] }));
+      setStatus("Connected");
+      if (!durTimer.current) durTimer.current = setInterval(() => setSecs(s => s + 1), 1000);
+      try {
+        const ctx = new AudioContext();
+        const src = ctx.createMediaStreamSource(e.streams[0]);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        const check = () => { analyser.getByteFrequencyData(data); const vol = data.reduce((a, b) => a + b, 0) / data.length; if (vol > 18) setActiveSpeaker(peerId); requestAnimationFrame(check); };
+        check();
+      } catch (_) {}
+    };
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) publish({ sender: myName, target: peerId, type: "ICE", callRoom: "channel1", payload: JSON.stringify(e.candidate) });
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === "disconnected") {
+        clearTimeout(endTimeout.current);
+        endTimeout.current = setTimeout(() => { if (["disconnected","failed"].includes(pc.iceConnectionState)) removePeer(peerId); }, 8000);
+        if (asInitiator) pc.restartIce();
+      } else if (pc.iceConnectionState === "failed") {
+        if (asInitiator) pc.restartIce(); else removePeer(peerId);
+      } else if (["connected","completed"].includes(pc.iceConnectionState)) {
+        clearTimeout(endTimeout.current);
+      }
+    };
+
+    if (asInitiator) {
+      (async () => {
+        try {
+          peersRef.current[peerId].makingOffer = true;
+          const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: mode === "video" });
+          await pc.setLocalDescription(offer);
+          publish({ sender: myName, target: peerId, type: "OFFER", callRoom: "channel1", payload: JSON.stringify(offer) });
+        } catch (err) { console.error("createOffer error:", err); }
+        finally { if (peersRef.current[peerId]) peersRef.current[peerId].makingOffer = false; }
+      })();
+    }
     return pc;
   };
-  const removePeer = (peerId) => { peersRef.current[peerId]?.pc?.close(); delete peersRef.current[peerId]; delete streamsRef.current[peerId]; setRemoteStreams(prev => { const n = { ...prev }; delete n[peerId]; return n; }); };
+
+  const removePeer = (peerId) => {
+    peersRef.current[peerId]?.pc?.close();
+    delete peersRef.current[peerId];
+    delete streamsRef.current[peerId];
+    setRemoteStreams(prev => { const n = { ...prev }; delete n[peerId]; return n; });
+  };
+
+  // ── Create a screen-share peer connection for one viewer ───
+  const createScreenPeer = (peerId, asInitiator) => {
+    if (screenPeers.current[peerId]?.pc) return screenPeers.current[peerId].pc;
+    const pc = new RTCPeerConnection(ICE_CONFIG);
+    screenPeers.current[peerId] = { pc, pendingCandidates: [], remoteDescSet: false };
+
+    if (screenStream.current)
+      screenStream.current.getTracks().forEach(t => pc.addTrack(t, screenStream.current));
+
+    // Receiver side — display the incoming screen stream
+    pc.ontrack = (e) => {
+      if (!e.streams[0]) return;
+      setRemoteScreenStreams(prev => ({ ...prev, [peerId]: e.streams[0] }));
+    };
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate)
+        publish({ sender: myName, target: peerId, type: "SCREEN_ICE", callRoom: "channel1", payload: JSON.stringify(e.candidate) });
+    };
+
+    if (asInitiator) {
+      (async () => {
+        try {
+          const offer = await pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: true });
+          await pc.setLocalDescription(offer);
+          publish({ sender: myName, target: peerId, type: "SCREEN_OFFER", callRoom: "channel1", payload: JSON.stringify(offer) });
+        } catch (err) { console.error("screen createOffer error:", err); }
+      })();
+    }
+    return pc;
+  };
+
+  const removeScreenPeer = (peerId) => {
+    screenPeers.current[peerId]?.pc?.close();
+    delete screenPeers.current[peerId];
+    setRemoteScreenStreams(prev => { const n = { ...prev }; delete n[peerId]; return n; });
+  };
+
+  // ── Start screen sharing ───────────────────────────────────
+  const startScreenShare = async () => {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      alert("Screen sharing is not supported in this browser or requires HTTPS.");
+      return;
+    }
+    try {
+      // Prompt the user to pick a screen / window / tab
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: "always" },
+        audio: false,
+      });
+      screenStream.current = stream;
+      setSharing(true);
+
+      // Show preview of own screen in the local tile
+      if (localScreenRef.current) {
+        localScreenRef.current.srcObject = stream;
+        localScreenRef.current.play().catch(() => {});
+      }
+
+      // Announce to all peers that screen share has started
+      publish({ sender: myName, type: "SCREEN_START", callRoom: "channel1", payload: "" });
+
+      // Initiate a new screen-share RTCPeerConnection to every connected peer
+      Object.keys(peersRef.current).forEach(peerId => createScreenPeer(peerId, true));
+
+      // When the user clicks "Stop sharing" in the browser bar
+      stream.getVideoTracks()[0].onended = () => stopScreenShare();
+    } catch (err) {
+      if (err.name !== "NotAllowedError") console.error("getDisplayMedia error:", err);
+    }
+  };
+
+  // ── Stop screen sharing ────────────────────────────────────
+  const stopScreenShare = () => {
+    if (screenStream.current) {
+      screenStream.current.getTracks().forEach(t => t.stop());
+      screenStream.current = null;
+    }
+    setSharing(false);
+    publish({ sender: myName, type: "SCREEN_STOP", callRoom: "channel1", payload: "" });
+    Object.keys(screenPeers.current).forEach(removeScreenPeer);
+    if (localScreenRef.current) localScreenRef.current.srcObject = null;
+  };
+
+  // ── WebRTC signal handler ──────────────────────────────────
   const handleSignal = async (sig) => {
     if (sig.sender === myName) return;
     if (sig.target && sig.target !== myName) return;
     const peerId = sig.sender;
-    if (sig.type === "PEER_JOIN") { const shouldInitiate = myName > peerId; createPeer(peerId, shouldInitiate); if (!shouldInitiate) { publish({ sender: myName, target: peerId, type: "PEER_JOIN", callRoom: "channel1", payload: "" }); } return; }
+
+    // ── Camera/mic signals ─────────────────────────────────
+    if (sig.type === "PEER_JOIN") {
+      const shouldInitiate = myName > peerId;
+      createPeer(peerId, shouldInitiate);
+      if (!shouldInitiate) publish({ sender: myName, target: peerId, type: "PEER_JOIN", callRoom: "channel1", payload: "" });
+      return;
+    }
     if (sig.type === "PEER_LEAVE") { removePeer(peerId); return; }
-    if (sig.type === "OFFER") { const peerState = peersRef.current[peerId] || {}; if (peerState.offerProcessing) return; peerState.offerProcessing = true; peerState.answerSent = false; peersRef.current[peerId] = peerState; const pc = createPeer(peerId, false); try { const sdp = JSON.parse(sig.payload); await pc.setRemoteDescription(new RTCSessionDescription(sdp)); peerState.remoteDescSet = true; for (const c of (peerState.pendingCandidates || [])) { try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {} } peerState.pendingCandidates = []; const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); peerState.answerSent = true; publish({ sender: myName, target: peerId, type: "ANSWER", callRoom: "channel1", payload: JSON.stringify(answer) }); } catch (err) { console.error("OFFER handling error:", err); } finally { peerState.offerProcessing = false; } return; }
-    if (sig.type === "ANSWER") { const peerState = peersRef.current[peerId]; if (!peerState?.pc) return; if (peerState.pc.signalingState === "stable") return; try { await peerState.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload))); peerState.remoteDescSet = true; for (const c of (peerState.pendingCandidates || [])) { try { await peerState.pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {} } peerState.pendingCandidates = []; } catch (err) { console.error("ANSWER error:", err); } return; }
-    if (sig.type === "ICE") { const peerState = peersRef.current[peerId]; if (!peerState?.pc) return; const candidate = JSON.parse(sig.payload); if (peerState.remoteDescSet) { try { await peerState.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) {} } else { peerState.pendingCandidates = [...(peerState.pendingCandidates || []), candidate]; } return; }
-    if (sig.type === "END") { removePeer(peerId); }
+
+    if (sig.type === "OFFER") {
+      const peerState = peersRef.current[peerId] || {};
+      if (peerState.offerProcessing) return;
+      peerState.offerProcessing = true; peerState.answerSent = false;
+      peersRef.current[peerId] = peerState;
+      const pc = createPeer(peerId, false);
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
+        peerState.remoteDescSet = true;
+        for (const c of (peerState.pendingCandidates || [])) { try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {} }
+        peerState.pendingCandidates = [];
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        peerState.answerSent = true;
+        publish({ sender: myName, target: peerId, type: "ANSWER", callRoom: "channel1", payload: JSON.stringify(answer) });
+      } catch (err) { console.error("OFFER error:", err); }
+      finally { peerState.offerProcessing = false; }
+      return;
+    }
+
+    if (sig.type === "ANSWER") {
+      const ps = peersRef.current[peerId];
+      if (!ps?.pc || ps.pc.signalingState === "stable") return;
+      try {
+        await ps.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
+        ps.remoteDescSet = true;
+        for (const c of (ps.pendingCandidates || [])) { try { await ps.pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {} }
+        ps.pendingCandidates = [];
+      } catch (err) { console.error("ANSWER error:", err); }
+      return;
+    }
+
+    if (sig.type === "ICE") {
+      const ps = peersRef.current[peerId];
+      if (!ps?.pc) return;
+      const candidate = JSON.parse(sig.payload);
+      if (ps.remoteDescSet) { try { await ps.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) {} }
+      else ps.pendingCandidates = [...(ps.pendingCandidates || []), candidate];
+      return;
+    }
+
+    if (sig.type === "END") { removePeer(peerId); return; }
+
+    // ── Screen share signals ───────────────────────────────
+    if (sig.type === "SCREEN_START") {
+      // A peer started sharing — create a receiver-side screen peer
+      createScreenPeer(peerId, false);
+      return;
+    }
+
+    if (sig.type === "SCREEN_STOP") { removeScreenPeer(peerId); return; }
+
+    if (sig.type === "SCREEN_OFFER") {
+      const sp = screenPeers.current[peerId] || {};
+      screenPeers.current[peerId] = sp;
+      const pc = createScreenPeer(peerId, false);
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
+        sp.remoteDescSet = true;
+        for (const c of (sp.pendingCandidates || [])) { try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {} }
+        sp.pendingCandidates = [];
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        publish({ sender: myName, target: peerId, type: "SCREEN_ANSWER", callRoom: "channel1", payload: JSON.stringify(answer) });
+      } catch (err) { console.error("SCREEN_OFFER error:", err); }
+      return;
+    }
+
+    if (sig.type === "SCREEN_ANSWER") {
+      const sp = screenPeers.current[peerId];
+      if (!sp?.pc || sp.pc.signalingState === "stable") return;
+      try {
+        await sp.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload)));
+        sp.remoteDescSet = true;
+        for (const c of (sp.pendingCandidates || [])) { try { await sp.pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {} }
+        sp.pendingCandidates = [];
+      } catch (err) { console.error("SCREEN_ANSWER error:", err); }
+      return;
+    }
+
+    if (sig.type === "SCREEN_ICE") {
+      const sp = screenPeers.current[peerId];
+      if (!sp?.pc) return;
+      const candidate = JSON.parse(sig.payload);
+      if (sp.remoteDescSet) { try { await sp.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) {} }
+      else sp.pendingCandidates = [...(sp.pendingCandidates || []), candidate];
+      return;
+    }
   };
+
   useEffect(() => {
     let mounted = true;
     const init = async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) { setStatus("Camera/mic unavailable — use HTTPS or localhost"); return; }
-        const stream = await navigator.mediaDevices.getUserMedia(mode === "video" ? { audio: true, video: { width: 1280, height: 720, facingMode: "user" } } : { audio: true, video: false });
+        const stream = await navigator.mediaDevices.getUserMedia(
+          mode === "video" ? { audio: true, video: { width: 1280, height: 720, facingMode: "user" } } : { audio: true, video: false }
+        );
         if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
         localStream.current = stream;
         if (mode === "video" && localRef.current) { localRef.current.srcObject = stream; localRef.current.play().catch(() => {}); }
-        if (stompClient?.current?.connected) { signalSub.current = stompClient.current.subscribe("/topic/call-signal", msg => { handleSignal(JSON.parse(msg.body)); }); publish({ sender: myName, type: "PEER_JOIN", callRoom: "channel1", payload: "" }); setStatus("Waiting for others…"); } else { setStatus("Not connected to server"); }
-      } catch (err) { if (!mounted) return; setStatus(err.name === "NotAllowedError" ? "Permission denied" : "Error: " + err.message); }
+        if (stompClient?.current?.connected) {
+          signalSub.current = stompClient.current.subscribe("/topic/call-signal", msg => { handleSignal(JSON.parse(msg.body)); });
+          publish({ sender: myName, type: "PEER_JOIN", callRoom: "channel1", payload: "" });
+          setStatus("Waiting for others…");
+        } else { setStatus("Not connected to server"); }
+      } catch (err) {
+        if (!mounted) return;
+        setStatus(err.name === "NotAllowedError" ? "Permission denied" : "Error: " + err.message);
+      }
     };
     init();
-    return () => { mounted = false; clearInterval(durTimer.current); clearTimeout(endTimeout.current); Object.values(peersRef.current).forEach(({ pc }) => pc?.close()); peersRef.current = {}; if (localStream.current) { localStream.current.getTracks().forEach(t => t.stop()); localStream.current = null; } signalSub.current?.unsubscribe(); if (stompClient?.current?.connected) { stompClient.current.publish({ destination: "/app/call-signal", body: JSON.stringify({ sender: myName, type: "PEER_LEAVE", callRoom: "channel1", payload: "" }) }); } };
+    return () => {
+      mounted = false;
+      clearInterval(durTimer.current);
+      clearTimeout(endTimeout.current);
+      Object.values(peersRef.current).forEach(({ pc }) => pc?.close());
+      Object.values(screenPeers.current).forEach(({ pc }) => pc?.close());
+      peersRef.current = {};
+      screenPeers.current = {};
+      if (localStream.current) { localStream.current.getTracks().forEach(t => t.stop()); localStream.current = null; }
+      if (screenStream.current) { screenStream.current.getTracks().forEach(t => t.stop()); screenStream.current = null; }
+      signalSub.current?.unsubscribe();
+      if (stompClient?.current?.connected)
+        stompClient.current.publish({ destination: "/app/call-signal", body: JSON.stringify({ sender: myName, type: "PEER_LEAVE", callRoom: "channel1", payload: "" }) });
+    };
   }, []); // eslint-disable-line
+
   const videoRefs = useRef({});
-  useEffect(() => { Object.entries(remoteStreams).forEach(([peerId, stream]) => { const el = videoRefs.current[peerId]; if (el && el.srcObject !== stream) { el.srcObject = stream; el.play().catch(() => {}); } }); }, [remoteStreams]);
-  useEffect(() => { if (localRef.current && localStream.current && mode === "video") { localRef.current.srcObject = localStream.current; localRef.current.play().catch(() => {}); } }, [mode]);
+  const screenVideoRefs = useRef({});
+
+  useEffect(() => {
+    Object.entries(remoteStreams).forEach(([peerId, stream]) => {
+      const el = videoRefs.current[peerId];
+      if (el && el.srcObject !== stream) { el.srcObject = stream; el.play().catch(() => {}); }
+    });
+  }, [remoteStreams]);
+
+  useEffect(() => {
+    Object.entries(remoteScreenStreams).forEach(([peerId, stream]) => {
+      const el = screenVideoRefs.current[peerId];
+      if (el && el.srcObject !== stream) { el.srcObject = stream; el.play().catch(() => {}); }
+    });
+  }, [remoteScreenStreams]);
+
+  useEffect(() => {
+    if (localRef.current && localStream.current && mode === "video") { localRef.current.srcObject = localStream.current; localRef.current.play().catch(() => {}); }
+  }, [mode]);
+
   const toggleMute = () => { const nowMuted = !muted; localStream.current?.getAudioTracks().forEach(t => { t.enabled = !nowMuted; }); setMuted(nowMuted); };
-  const toggleCam = () => { const nowOff = !camOff; localStream.current?.getVideoTracks().forEach(t => { t.enabled = !nowOff; }); setCamOff(nowOff); };
+  const toggleCam  = () => { const nowOff = !camOff; localStream.current?.getVideoTracks().forEach(t => { t.enabled = !nowOff; }); setCamOff(nowOff); };
+
   const peers = Object.keys(remoteStreams);
+  const screenSharers = Object.keys(remoteScreenStreams);
   const totalParticipants = peers.length + 1;
   const cols = Math.ceil(Math.sqrt(totalParticipants));
   const rows = Math.ceil(totalParticipants / cols);
+
   const overlayStyle = { position: "fixed", inset: 0, zIndex: 100, fontFamily: "'Plus Jakarta Sans', sans-serif", background: "linear-gradient(135deg, #06030f 0%, #0d0520 40%, #030d1a 100%)", display: "flex", flexDirection: "column", overflow: "hidden" };
-  const headerStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, zIndex: 2 };
-  const gridStyle = { flex: 1, display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: 8, padding: 12, minHeight: 0 };
-  const tileBase = (isActive) => ({ position: "relative", borderRadius: 16, overflow: "hidden", background: "rgba(255,255,255,0.04)", border: isActive ? "2px solid rgba(196,109,255,0.8)" : "1.5px solid rgba(255,255,255,0.07)", boxShadow: isActive ? "0 0 24px rgba(196,109,255,0.25), inset 0 0 0 1px rgba(196,109,255,0.15)" : "none", transition: "border-color 0.3s, box-shadow 0.3s", display: "flex", alignItems: "center", justifyContent: "center" });
+  const headerStyle  = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, zIndex: 2 };
+  const gridStyle    = { flex: 1, display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: 8, padding: 12, minHeight: 0 };
+  const tileBase     = (isActive) => ({ position: "relative", borderRadius: 16, overflow: "hidden", background: "rgba(255,255,255,0.04)", border: isActive ? "2px solid rgba(196,109,255,0.8)" : "1.5px solid rgba(255,255,255,0.07)", transition: "border-color 0.3s, box-shadow 0.3s", display: "flex", alignItems: "center", justifyContent: "center" });
   const nameTagStyle = { position: "absolute", bottom: 10, left: 12, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 600, color: "#fff", display: "flex", alignItems: "center", gap: 6 };
-  const avatarStyle = { width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#c46dff,#7b8cff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "#fff", boxShadow: "0 0 32px rgba(196,109,255,0.3)" };
-  const ctrlBar = { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "16px 24px", background: "rgba(0,0,0,0.4)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 };
-  const btn = (bg, size = 52) => ({ width: size, height: size, borderRadius: "50%", border: "none", background: bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(0,0,0,0.4)", transition: "transform 0.12s, opacity 0.12s, box-shadow 0.12s", flexShrink: 0 });
+  const avatarStyle  = { width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#c46dff,#7b8cff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "#fff" };
+  const ctrlBar      = { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "16px 24px", background: "rgba(0,0,0,0.4)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 };
+  const btn          = (bg, size = 52) => ({ width: size, height: size, borderRadius: "50%", border: "none", background: bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(0,0,0,0.4)", transition: "transform 0.12s", flexShrink: 0 });
+
   return (
     <div style={overlayStyle}>
-      <style>{`@keyframes callPulse { 0%,100%{opacity:1} 50%{opacity:0.5} } @keyframes speakRing { 0%,100%{box-shadow:0 0 0 0 rgba(196,109,255,0.6)} 50%{box-shadow:0 0 0 8px rgba(196,109,255,0)} } .call-ctrl-btn:hover { transform:scale(1.1) !important; } .call-ctrl-btn:active { transform:scale(0.93) !important; }`}</style>
+      <style>{`@keyframes callPulse{0%,100%{opacity:1}50%{opacity:0.5}} @keyframes speakRing{0%,100%{box-shadow:0 0 0 0 rgba(196,109,255,0.6)}50%{box-shadow:0 0 0 8px rgba(196,109,255,0)}} .call-ctrl-btn:hover{transform:scale(1.1)!important} .call-ctrl-btn:active{transform:scale(0.93)!important}`}</style>
+
+      {/* Header */}
       <div style={headerStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px #22c55e", animation: "callPulse 2s infinite" }} />
           <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.9)" }}>{mode === "video" ? "📹" : "🔊"} Channel 1</span>
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>{status === "Connected" || peers.length > 0 ? fmt(secs) : status}</span>
+          {sharing && <span style={{ fontSize: 11, background: "rgba(196,109,255,0.2)", border: "1px solid rgba(196,109,255,0.4)", borderRadius: 6, padding: "2px 8px", color: "#c46dff" }}>🖥 Sharing</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{totalParticipants} participant{totalParticipants !== 1 ? "s" : ""}</span></div>
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{totalParticipants} participant{totalParticipants !== 1 ? "s" : ""}</span>
       </div>
+
+      {/* Screen share viewers */}
+      {screenSharers.length > 0 && (
+        <div style={{ display: "flex", gap: 8, padding: "8px 12px 0", flexShrink: 0, overflowX: "auto" }}>
+          {screenSharers.map(peerId => (
+            <div key={peerId} style={{ position: "relative", flex: "0 0 auto", width: 320, height: 180, borderRadius: 12, overflow: "hidden", background: "#000", border: "1.5px solid rgba(196,109,255,0.4)" }}>
+              <video ref={el => { if (el) screenVideoRefs.current[peerId] = el; }} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <div style={{ position: "absolute", bottom: 6, left: 8, fontSize: 11, color: "#c46dff", background: "rgba(0,0,0,0.6)", borderRadius: 6, padding: "2px 8px" }}>🖥 {peerId}'s screen</div>
+            </div>
+          ))}
+          {sharing && (
+            <div style={{ position: "relative", flex: "0 0 auto", width: 320, height: 180, borderRadius: 12, overflow: "hidden", background: "#000", border: "1.5px solid #22c55e" }}>
+              <video ref={localScreenRef} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <div style={{ position: "absolute", bottom: 6, left: 8, fontSize: 11, color: "#22c55e", background: "rgba(0,0,0,0.6)", borderRadius: 6, padding: "2px 8px" }}>🖥 Your screen (preview)</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Participant grid */}
       {mode === "video" ? (
         <div style={gridStyle}>
           <div style={tileBase(false)}>
@@ -318,7 +648,7 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
           {peers.map(peerId => (
             <div key={peerId} style={tileBase(activeSpeaker === peerId)}>
               <video ref={el => { if (el) videoRefs.current[peerId] = el; }} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              <div style={nameTagStyle}><span style={{ width: 6, height: 6, borderRadius: "50%", background: activeSpeaker === peerId ? "#22c55e" : "rgba(255,255,255,0.3)", transition: "background 0.2s" }} /><span>{peerId}</span></div>
+              <div style={nameTagStyle}><span style={{ width: 6, height: 6, borderRadius: "50%", background: activeSpeaker === peerId ? "#22c55e" : "rgba(255,255,255,0.3)" }} /><span>{peerId}</span></div>
             </div>
           ))}
         </div>
@@ -326,7 +656,7 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
         <div style={{ ...gridStyle }}>
           <div style={tileBase(false)}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-              <div style={{ ...avatarStyle, animation: "none" }}>{myName[0]?.toUpperCase()}</div>
+              <div style={avatarStyle}>{myName[0]?.toUpperCase()}</div>
               <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>{myName}</span>
               <span style={{ fontSize: 11, color: muted ? "#fb7185" : "#22c55e" }}>{muted ? "🔇 Muted" : "🎙 Speaking"}</span>
             </div>
@@ -334,7 +664,7 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
           {peers.map(peerId => (
             <div key={peerId} style={tileBase(activeSpeaker === peerId)}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-                <div style={{ ...avatarStyle, animation: activeSpeaker === peerId ? "speakRing 1s infinite" : "none", background: `linear-gradient(135deg, ${["#c46dff","#06b6d4","#ec4899","#059669","#f59e0b"][peerId.charCodeAt(0) % 5]}, #7b8cff)` }}>{peerId[0]?.toUpperCase()}</div>
+                <div style={{ ...avatarStyle, animation: activeSpeaker === peerId ? "speakRing 1s infinite" : "none" }}>{peerId[0]?.toUpperCase()}</div>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>{peerId}</span>
                 <span style={{ fontSize: 11, color: activeSpeaker === peerId ? "#22c55e" : "rgba(255,255,255,0.3)" }}>{activeSpeaker === peerId ? "🎙 Speaking" : "○ Silent"}</span>
               </div>
@@ -343,63 +673,36 @@ function CallOverlay({ mode, myName, isCaller, stompClient, onEnd }) {
           ))}
         </div>
       )}
+
+      {/* Control bar */}
       <div style={ctrlBar}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
           <button className="call-ctrl-btn" style={btn(muted ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.12)")} onClick={toggleMute}>{muted ? <IcoMicOff color="#1a0533" /> : <IcoMic color="#fff" />}</button>
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{muted ? "Unmute" : "Mute"}</span>
         </div>
+
+        {/* Screen share button */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <button className="call-ctrl-btn" title={sharing ? "Stop sharing" : "Share screen"} style={btn(sharing ? "rgba(196,109,255,0.3)" : "rgba(255,255,255,0.12)")} onClick={sharing ? stopScreenShare : startScreenShare}>
+            <span style={{ fontSize: 20 }}>🖥</span>
+          </button>
+          <span style={{ fontSize: 10, color: sharing ? "#c46dff" : "rgba(255,255,255,0.4)" }}>{sharing ? "Stop" : "Share"}</span>
+        </div>
+
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
           <button className="call-ctrl-btn" style={{ ...btn("#ef4444", 64), boxShadow: "0 4px 24px rgba(239,68,68,0.45)" }} onClick={() => onEnd(secs)}><IcoPhoneOff color="#fff" /></button>
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Leave</span>
         </div>
+
         {mode === "video" && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <button className="call-ctrl-btn" style={btn(camOff ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.12)")} onClick={toggleCam}>{camOff ? <IcoVideo color="#1a0533" /> : <IcoVideoOff color="#fff" />}</button>
             <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{camOff ? "Cam on" : "Cam off"}</span>
           </div>
         )}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <button className="call-ctrl-btn" style={btn(screenSharing ? "rgba(34,197,94,0.9)" : "rgba(255,255,255,0.12)")} onClick={() => {
-            if (screenSharing) {
-              // Stop sharing
-              screenStream?.getTracks().forEach(t => t.stop());
-              setScreenStream(null);
-              setScreenSharing(false);
-              if (stompClient?.current?.connected) {
-                stompClient.current.publish({ destination: "/app/screen.stop", body: JSON.stringify({ sender: myName, roomId: "channel1", type: "SCREEN_STOP" }) });
-              }
-            } else {
-              // Start sharing
-              if (!navigator.mediaDevices?.getDisplayMedia) {
-                alert("Screen sharing requires HTTPS. Access the app via https:// or use localhost instead of an IP address.");
-                return;
-              }
-              navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: false })
-                .then(stream => {
-                  setScreenStream(stream);
-                  setScreenSharing(true);
-                  // Notify others via WebSocket
-                  if (stompClient?.current?.connected) {
-                    stompClient.current.publish({ destination: "/app/screen.start", body: JSON.stringify({ sender: myName, roomId: "channel1", type: "SCREEN_START", shareMode: "SCREEN" }) });
-                  }
-                  // Auto-stop when user clicks "Stop sharing" in the browser UI
-                  stream.getVideoTracks()[0].onended = () => {
-                    setScreenStream(null);
-                    setScreenSharing(false);
-                    if (stompClient?.current?.connected) {
-                      stompClient.current.publish({ destination: "/app/screen.stop", body: JSON.stringify({ sender: myName, roomId: "channel1", type: "SCREEN_STOP" }) });
-                    }
-                  };
-                })
-                .catch(() => {}); // user cancelled the picker
-            }
-          }}>
-            <span style={{ fontSize: 18 }}>🖥️</span>
-          </button>
-          <span style={{ fontSize: 10, color: screenSharing ? "#22c55e" : "rgba(255,255,255,0.4)" }}>{screenSharing ? "Stop Share" : "Share"}</span>
-        </div>
+
         <div style={{ marginLeft: "auto", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 999, padding: "6px 16px", fontSize: 12, color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />{totalParticipants} in call
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />{totalParticipants} in call
         </div>
       </div>
     </div>
@@ -548,20 +851,10 @@ function ProfileModal({ onClose, authToken, user, onUpdate }) {
   );
 }
 
-function KeybindRow({ label, hint, value, onChange, style }) {
-  const [listening, setListening] = React.useState(false);
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", ...style }}>
-      <div><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{label}</div>{hint && <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{hint}</div>}</div>
-      <button style={{ minWidth: 80, padding: "6px 14px", borderRadius: 8, border: listening ? "1px solid var(--accent)" : "1px solid var(--glass-border)", background: listening ? "var(--accent-soft)" : "var(--input-bg)", color: listening ? "var(--accent)" : "var(--text)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "monospace", letterSpacing: "0.5px" }} onClick={() => setListening(true)} onBlur={() => setListening(false)} onKeyDown={e => { if (!listening) return; e.preventDefault(); e.stopPropagation(); const key = e.key === " " ? "Space" : e.key; if (key !== "Tab") { onChange(key); setListening(false); } }}>{listening ? "Press a key…" : (value || "—")}</button>
-    </div>
-  );
-}
-
-function SettingsModal({ onClose, tab, setTab, dark, setDark, authToken, authUser, myProfile, onUpdateProfile, fontSize, setFontSize, bubbleStyle, setBubbleStyle, notifSound, setNotifSound, compactMode, setCompactMode, privacyDm, setPrivacyDm, privacyFriend, setPrivacyFriend, onLogout, onEndCall, keybinds, saveKeybinds }) {
+function SettingsModal({ onClose, tab, setTab, dark, setDark, authToken, authUser, myProfile, onUpdateProfile, fontSize, setFontSize, bubbleStyle, setBubbleStyle, notifSound, setNotifSound, compactMode, setCompactMode, privacyDm, setPrivacyDm, privacyFriend, setPrivacyFriend, onLogout, onEndCall }) {
   const [currentPw, setCurrentPw] = useState(""); const [newPw, setNewPw] = useState(""); const [confirmPw, setConfirmPw] = useState(""); const [pwMsg, setPwMsg] = useState(null); const [emailMsg, setEmailMsg] = useState(null); const [email, setEmail] = useState(myProfile?.email || ""); const [displayName, setDisplayName] = useState(myProfile?.displayName || ""); const [bio, setBio] = useState(myProfile?.bio || ""); const [profileMsg, setProfileMsg] = useState(null); const fileRef = useRef(null);
   const BASE = "http://192.168.108.132:8080";
-  const tabs = [{ id: "account", label: "👤 My Account", group: "USER SETTINGS" }, { id: "profile", label: "🪪 Profile", group: "USER SETTINGS" }, { id: "privacy", label: "🔒 Privacy & Safety", group: "USER SETTINGS" }, { id: "appearance", label: "🎨 Appearance", group: "APP SETTINGS" }, { id: "notifications", label: "🔔 Notifications", group: "APP SETTINGS" }, { id: "keybinds", label: "⌨️ Keybinds", group: "APP SETTINGS" }, { id: "danger", label: "⚠️ Danger Zone", group: "ACCOUNT" }];
+  const tabs = [{ id: "account", label: "👤 My Account", group: "USER SETTINGS" }, { id: "profile", label: "🪪 Profile", group: "USER SETTINGS" }, { id: "privacy", label: "🔒 Privacy & Safety", group: "USER SETTINGS" }, { id: "appearance", label: "🎨 Appearance", group: "APP SETTINGS" }, { id: "notifications", label: "🔔 Notifications", group: "APP SETTINGS" }, { id: "danger", label: "⚠️ Danger Zone", group: "ACCOUNT" }];
   const groups = [...new Set(tabs.map(t => t.group))];
   const [verifyCode, setVerifyCode] = useState(""); const [codeSent, setCodeSent] = useState(false); const [sendingCode, setSendingCode] = useState(false);
   const sendCode = async () => { setSendingCode(true); setPwMsg(null); try { const res = await fetch(`${BASE}/auth/send-code`, { method: "POST", headers: { Authorization: `Bearer ${authToken}` } }); const data = await res.json(); if (!res.ok) { setPwMsg({ ok: false, text: data.error }); setSendingCode(false); return; } setCodeSent(true); setPwMsg({ ok: true, text: data.message }); } catch { setPwMsg({ ok: false, text: "Server error" }); } setSendingCode(false); };
@@ -585,8 +878,8 @@ function SettingsModal({ onClose, tab, setTab, dark, setDark, authToken, authUse
     if (tab === "account-username") return (<div><div style={sectionTitle}>Change Username</div><p style={sectionDesc}>Choose a new unique username. You will be issued a new login token.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>{pwMsg && <div style={msgStyle(pwMsg.ok)}>{pwMsg.ok ? "✅" : "⚠️"} {pwMsg.text}</div>}<label style={labelStyle}>New Username</label><input style={inputStyle} value={currentPw} onChange={e => setCurrentPw(e.target.value)} placeholder="Enter new username (3–32 chars, letters/numbers/_/.)" /><div style={{ display: "flex", gap: 10, marginTop: 4 }}><button style={saveBtn} onClick={async () => { setPwMsg(null); try { const res = await fetch(`${BASE}/auth/change-username`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newUsername: currentPw }) }); const data = await res.json(); if (!res.ok) { setPwMsg({ ok: false, text: data.error }); return; } setPwMsg({ ok: true, text: "Username changed! Please log in again." }); setTimeout(() => { onEndCall?.(); onLogout(); }, 1500); } catch { setPwMsg({ ok: false, text: "Server error" }); } }}>Save Username</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => setTab("account")}>Cancel</button></div></div></div>);
     if (tab === "account") return (<div><div style={{ background: "var(--bubble-me)", borderRadius: 12, padding: "40px 20px 20px", marginBottom: 24, position: "relative", overflow: "hidden" }}><div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,rgba(196,109,255,0.8),rgba(123,140,255,0.8))" }} /><div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 16 }}><div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()}><div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.2)", border: "4px solid var(--glass2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, color: "#fff", overflow: "hidden" }}>{myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.108.132:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : authUser?.[0]?.toUpperCase()}</div><div style={{ position: "absolute", bottom: 2, right: 2, width: 22, height: 22, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, border: "2px solid var(--glass2)" }}>✏️</div></div><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) uploadAvatar(e.target.files[0]); }} /><div><div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{myProfile?.displayName || authUser}</div><div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>@{authUser}</div></div></div></div><div style={sectionTitle}>Account Information</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px", marginBottom: 20 }}><Row label="Username" desc={`@${authUser}`}><button onClick={() => setTab("account-username")} style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }}>Change</button></Row><Row label="Email" desc={myProfile?.email || "No email set"}><button onClick={() => setTab("account-email")} style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }}>Edit</button></Row></div><div style={sectionTitle}>Change Password</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, marginBottom: 20 }}>{pwMsg && <div style={msgStyle(pwMsg.ok)}>{pwMsg.ok ? "✅" : "⚠️"} {pwMsg.text}</div>}{!codeSent ? (<><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14, lineHeight: 1.6 }}>A 6-digit verification code will be sent to your registered email address.{!myProfile?.email && <span style={{ color: "#fb7185" }}> You need to add an email address first.</span>}</div><button style={{ ...saveBtn, opacity: myProfile?.email ? 1 : 0.5, cursor: myProfile?.email ? "pointer" : "not-allowed" }} onClick={myProfile?.email ? sendCode : undefined} disabled={sendingCode}>{sendingCode ? "Sending…" : "Send Verification Code"}</button></>) : (<><label style={labelStyle}>Verification Code</label><input style={inputStyle} value={verifyCode} onChange={e => setVerifyCode(e.target.value)} placeholder="Enter 6-digit code" maxLength={6} /><label style={labelStyle}>New Password</label><input type="password" style={inputStyle} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Enter new password" /><label style={labelStyle}>Confirm New Password</label><input type="password" style={{ ...inputStyle, marginBottom: 14 }} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Confirm new password" /><div style={{ display: "flex", gap: 10 }}><button style={saveBtn} onClick={changePassword}>Change Password</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => { setCodeSent(false); setPwMsg(null); setVerifyCode(""); }}>Resend Code</button></div></>)}</div><div style={sectionTitle}>Email Address</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>{emailMsg && <div style={msgStyle(emailMsg.ok)}>{emailMsg.ok ? "✅" : "⚠️"} {emailMsg.text}</div>}<label style={labelStyle}>Email</label><input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" /><button style={saveBtn} onClick={saveEmail}>Save Email</button></div></div>);
     if (tab === "profile") return (<div><div style={sectionTitle}>Display Name</div><p style={sectionDesc}>This is how others see you in chat.</p>{profileMsg && <div style={msgStyle(profileMsg.ok)}>{profileMsg.ok ? "✅" : "⚠️"} {profileMsg.text}</div>}<div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, marginBottom: 20 }}><label style={labelStyle}>Display Name</label><input style={inputStyle} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your display name" /><label style={labelStyle}>Bio</label><textarea style={{ ...inputStyle, height: 80, resize: "none" }} value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell others about yourself" /><button style={saveBtn} onClick={saveProfile}>Save Profile</button></div><div style={sectionTitle}>Avatar</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, display: "flex", alignItems: "center", gap: 16 }}><div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--bubble-me)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", overflow: "hidden", flexShrink: 0 }}>{myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.108.132:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : authUser?.[0]?.toUpperCase()}</div><div><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 10 }}>JPG, GIF or PNG. Max size 8MB.</div><div style={{ display: "flex", gap: 8 }}><button style={saveBtn} onClick={() => fileRef.current?.click()}>Change Avatar</button><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) uploadAvatar(e.target.files[0]); }} /></div></div></div></div>);
-    if (tab === "appearance") return (<div><div style={sectionTitle}>Theme</div><p style={sectionDesc}>Choose how CosmoChat looks to you.</p><div style={{ display: "flex", gap: 12, marginBottom: 24 }}>{[{ id: "dark", label: "🌙 Dark" }, { id: "light", label: "☀️ Light" }].map(t => (<button key={t.id} onClick={() => setDark(t.id === "dark")} style={{ flex: 1, padding: "16px", borderRadius: 12, border: `2px solid ${(dark ? "dark" : "light") === t.id ? "var(--accent)" : "var(--glass-border)"}`, background: (dark ? "dark" : "light") === t.id ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{t.label}</button>))}</div><div style={sectionTitle}>Font Size</div><p style={sectionDesc}>Scale the chat text to your preference.</p><div style={{ display: "flex", gap: 8, marginBottom: 24 }}>{["small", "medium", "large"].map(s => (<button key={s} onClick={() => setFontSize(s)} style={{ flex: 1, padding: "12px", borderRadius: 10, border: `2px solid ${fontSize === s ? "var(--accent)" : "var(--glass-border)"}`, background: fontSize === s ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: s === "small" ? 12 : s === "medium" ? 14 : 16, fontWeight: 600, cursor: "pointer", textTransform: "capitalize" }}>{s}</button>))}</div><div style={sectionTitle}>Message Bubble Style</div><p style={sectionDesc}>Change how message bubbles look.</p><div style={{ display: "flex", gap: 8, marginBottom: 24 }}>{["rounded", "sharp", "minimal"].map(s => (<button key={s} onClick={() => setBubbleStyle(s)} style={{ flex: 1, padding: "12px", borderRadius: 10, border: `2px solid ${bubbleStyle === s ? "var(--accent)" : "var(--glass-border)"}`, background: bubbleStyle === s ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", textTransform: "capitalize" }}>{s}</button>))}</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px" }}><Row label="Compact Mode" desc="Reduce spacing between messages"><Toggle on={compactMode} onChange={setCompactMode} /></Row></div></div>);
-    if (tab === "keybinds") { const actions = [{ key: "sendMessage", label: "Send message", hint: "Enter / Shift+Enter for newline" }, { key: "toggleMute", label: "Mute/unmute mic", hint: "In call" }, { key: "toggleCamera", label: "Toggle camera", hint: "In video call" }, { key: "leaveCall", label: "Leave call", hint: "" }, { key: "closeModal", label: "Close modal", hint: "" }, { key: "openSettings", label: "Open settings", hint: "When not typing" }]; return (<div><div style={sectionTitle}>Keyboard Shortcuts</div><p style={sectionDesc}>Click a binding and press a key to change it.</p><div style={{ background: "var(--glass2)", borderRadius: 10, overflow: "hidden" }}>{actions.map(({ key, label, hint }, i) => (<KeybindRow key={key} label={label} hint={hint} value={keybinds[key]} onChange={newKey => saveKeybinds({ ...keybinds, [key]: newKey })} style={{ borderBottom: i < actions.length - 1 ? "1px solid var(--divider)" : "none" }} />))}</div><button style={{ ...saveBtn, marginTop: 16, background: "rgba(255,255,255,0.08)" }} onClick={() => saveKeybinds({ sendMessage: "Enter", toggleMute: "m", toggleCamera: "v", leaveCall: "Escape", closeModal: "Escape", openSettings: "," })}>Reset to defaults</button></div>); }
+    if (tab === "appearance") return (<div><div style={sectionTitle}>Theme</div><p style={sectionDesc}>Choose how CosmoChat looks to you.</p><div style={{ display: "flex", gap: 12, marginBottom: 24 }}>{[{ id: "dark", label: "🌙 Dark" }, { id: "light", label: "☀️ Light" }].map(t => (<button key={t.id} onClick={() => setDark(t.id === "dark")} style={{ flex: 1, padding: "16px", borderRadius: 12, border: `2px solid ${(dark ? "dark" : "light") === t.id ? "var(--accent)" : "var(--glass-border)"}`, background: (dark ? "dark" : "light") === t.id ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>{t.label}</button>))}</div><div style={sectionTitle}>Font Size</div><p style={sectionDesc}>Scale the chat text to your preference.</p><div style={{ display: "flex", gap: 8, marginBottom: 24 }}>{["small", "medium", "large"].map(s => (<button key={s} onClick={() => setFontSize(s)} style={{ flex: 1, padding: "12px", borderRadius: 10, border: `2px solid ${fontSize === s ? "var(--accent)" : "var(--glass-border)"}`, background: fontSize === s ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: s === "small" ? 12 : s === "medium" ? 14 : 16, fontWeight: 600, cursor: "pointer", textTransform: "capitalize" }}>{s}</button>))}</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px" }}><Row label="Compact Mode" desc="Reduce spacing between messages"><Toggle on={compactMode} onChange={setCompactMode} /></Row></div></div>);
+    
     if (tab === "notifications") return (<div><div style={sectionTitle}>Notifications</div><p style={sectionDesc}>Control how and when you get notified.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px" }}><Row label="Message Sound" desc="Play a sound when a message arrives"><Toggle on={notifSound} onChange={setNotifSound} /></Row><Row label="Desktop Notifications" desc="Show notifications outside the browser"><button style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }} onClick={() => Notification.requestPermission()}>{Notification.permission === "granted" ? "✅ Enabled" : "Enable"}</button></Row></div></div>);
     if (tab === "privacy") return (<div><div style={sectionTitle}>Privacy & Safety</div><p style={sectionDesc}>Control who can interact with you.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px", marginBottom: 20 }}><Row label="Who can DM me" desc="Control who can send you direct messages"><select value={privacyDm} onChange={e => setPrivacyDm(e.target.value)} style={{ background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 8, padding: "6px 12px", color: "var(--text)", fontFamily: "inherit", fontSize: 13, outline: "none" }}><option value="everyone">Everyone</option><option value="friends">Friends only</option><option value="nobody">Nobody</option></select></Row><Row label="Who can send friend requests" desc="Control who can add you as a friend"><select value={privacyFriend} onChange={e => setPrivacyFriend(e.target.value)} style={{ background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 8, padding: "6px 12px", color: "var(--text)", fontFamily: "inherit", fontSize: 13, outline: "none" }}><option value="everyone">Everyone</option><option value="nobody">Nobody</option></select></Row></div><div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>⚠️ Privacy settings are stored locally and enforced on the frontend only. Full server-side enforcement coming soon.</div></div>);
     if (tab === "danger") return (<div><div style={{ ...sectionTitle, color: "#fb7185" }}>⚠️ Danger Zone</div><p style={sectionDesc}>These actions are irreversible. Please be careful.</p><div style={{ background: "rgba(251,113,133,0.07)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 10, padding: 20, marginBottom: 16 }}><div style={{ fontSize: 15, fontWeight: 700, color: "#fb7185", marginBottom: 6 }}>Log Out</div><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14 }}>Sign out of your account on this device.</div><button onClick={() => { onEndCall?.(); onLogout(); }} style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(251,113,133,0.3)", background: "rgba(251,113,133,0.15)", color: "#fb7185", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Log Out</button></div><div style={{ background: "rgba(251,113,133,0.07)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 10, padding: 20 }}><div style={{ fontSize: 15, fontWeight: 700, color: "#fb7185", marginBottom: 6 }}>Delete Account</div><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14 }}>Permanently delete your account and all your data. This cannot be undone.</div><button style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(251,113,133,0.4)", background: "#fb7185", color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer" }} onClick={async () => { if (!window.confirm("Permanently delete your account? This CANNOT be undone.")) return; const confirmed = window.prompt('Type "DELETE" to confirm:'); if (confirmed !== "DELETE") return; try { const res = await fetch(`${BASE}/auth/delete-account`, { method: "DELETE", headers: { Authorization: `Bearer ${authToken}` } }); if (res.ok) { onEndCall?.(); onLogout(); } else { const d = await res.json(); alert("Error: " + (d.error || "Could not delete account")); } } catch { alert("Server error. Try again."); } }}>Delete Account</button></div></div>);
@@ -857,11 +1150,10 @@ const buildCSS = (dark) => `
   .sb-user-name { font-size:14px; font-weight:700; color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 `;
 
-const getTime = () => {
-  const now = new Date();
-  return now.toLocaleDateString([], { month: "short", day: "numeric" })
-    + " " + now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-};
+// ── Change this one line when your backend IP changes ──────
+const BASE = "http://192.168.108.132:8080";
+
+const getTime = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const initial = (n) => (n || "?")[0].toUpperCase();
 
 /* ─────────────────────────────────────────────────────────
@@ -885,6 +1177,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const [allUsers, setAllUsers] = useState([]);
   const [myProfile, setMyProfile] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [showMoodPicker, setShowMoodPicker] = useState(false);
   const [dmUnread, setDmUnread] = useState({});
   const [channelUnread, setChannelUnread] = useState(0);
   const [roomUnread, setRoomUnread] = useState({});
@@ -894,13 +1187,12 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState("account");
   const [fontSize, setFontSize] = useState(() => localStorage.getItem("fontSize") || "medium");
-  const [bubbleStyle, setBubbleStyle] = useState(() => localStorage.getItem("bubbleStyle") || "rounded");
+  
   const [notifSound, setNotifSound] = useState(() => localStorage.getItem("notifSound") !== "false");
   const [compactMode, setCompactMode] = useState(() => localStorage.getItem("compactMode") === "true");
   const [privacyDm, setPrivacyDm] = useState(() => localStorage.getItem("privacyDm") || "everyone");
   const [privacyFriend, setPrivacyFriend] = useState(() => localStorage.getItem("privacyFriend") || "everyone");
-  const [keybinds, setKeybinds] = useState(() => { try { return JSON.parse(localStorage.getItem("keybinds") || "null") || { sendMessage: "Enter", toggleMute: "m", toggleCamera: "v", leaveCall: "Escape", closeModal: "Escape", openSettings: "," }; } catch { return { sendMessage: "Enter", toggleMute: "m", toggleCamera: "v", leaveCall: "Escape", closeModal: "Escape", openSettings: "," }; } });
-  const saveKeybinds = (kb) => { setKeybinds(kb); localStorage.setItem("keybinds", JSON.stringify(kb)); };
+  
   const [reactions, setReactions] = useState({});
   const [editingMsg, setEditingMsg] = useState(null);
   const [editText, setEditText] = useState("");
@@ -953,7 +1245,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
 
   const connect = () => {
     const client = new Client({
-      webSocketFactory: () => new SockJS("http://192.168.108.132:8080/ws"),
+      webSocketFactory: () => new SockJS(`${BASE}/ws`),
       reconnectDelay: 5000,
       connectHeaders: { Authorization: `Bearer ${authToken}` },
       onConnect: async () => {
@@ -1078,7 +1370,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const handleDrop = (e) => { e.preventDefault(); dragCounter.current = 0; setDragOver(false); const file = e.dataTransfer.files[0]; if (!file) return; if (file.type.startsWith("image/")) uploadFile(file, "IMAGE"); else if (file.type.startsWith("video/")) uploadFile(file, "VIDEO"); else if (file.type.startsWith("audio/")) uploadFile(file, "AUDIO"); else uploadFile(file, "FILE"); };
 
   const renderContent = (msg) => {
-    if (msg.type === "POLL" && msg.pollData) { const poll = msg.pollData; const totalVotes = poll.totalVotes || 0; return (<div style={{ background: "var(--glass2)", border: "1px solid var(--glass-border)", borderRadius: 14, padding: "14px 16px", minWidth: 260, maxWidth: 340 }}><div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>📊 {poll.question}</div>{poll.options?.map(opt => { const pct = totalVotes > 0 ? Math.round((opt.voteCount / totalVotes) * 100) : 0; return (<div key={opt.id} onClick={() => { if (!poll.active) return; fetch(`http://192.168.100.127:8080/polls/${poll.id}/vote`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ optionIds: [opt.id] }) }).then(r => r.json()).then(updated => setMessages(prev => prev.map(m => m.pollId === poll.id ? { ...m, pollData: updated } : m))).catch(() => {}); }} style={{ marginBottom: 6, cursor: poll.active ? "pointer" : "default" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}><span>{opt.emoji || ""} {opt.text}</span><span style={{ color: "var(--text-muted)" }}>{pct}% ({opt.voteCount})</span></div><div style={{ height: 6, borderRadius: 3, background: "var(--glass-border)", overflow: "hidden" }}><div style={{ height: "100%", width: pct + "%", background: opt.votedByMe ? "var(--accent)" : "var(--bubble-me)", transition: "width 0.3s" }} /></div></div>); })}<div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>{totalVotes} vote{totalVotes !== 1 ? "s" : ""} · {poll.active ? "Open" : "Closed"}</div></div>); }
+    if (msg.type === "POLL" && msg.pollData) { const poll = msg.pollData; const totalVotes = poll.totalVotes || 0; return (<div style={{ background: "var(--glass2)", border: "1px solid var(--glass-border)", borderRadius: 14, padding: "14px 16px", minWidth: 260, maxWidth: 340 }}><div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>📊 {poll.question}</div>{poll.options?.map(opt => { const pct = totalVotes > 0 ? Math.round((opt.voteCount / totalVotes) * 100) : 0; return (<div key={opt.id} onClick={() => { if (!poll.active) return; fetch(`http://192.168.108.132:8080/polls/${poll.id}/vote`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ optionIds: [opt.id] }) }).then(r => r.json()).then(updated => setMessages(prev => prev.map(m => m.pollId === poll.id ? { ...m, pollData: updated } : m))).catch(() => {}); }} style={{ marginBottom: 6, cursor: poll.active ? "pointer" : "default" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}><span>{opt.emoji || ""} {opt.text}</span><span style={{ color: "var(--text-muted)" }}>{pct}% ({opt.voteCount})</span></div><div style={{ height: 6, borderRadius: 3, background: "var(--glass-border)", overflow: "hidden" }}><div style={{ height: "100%", width: pct + "%", background: opt.votedByMe ? "var(--accent)" : "var(--bubble-me)", transition: "width 0.3s" }} /></div></div>); })}<div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>{totalVotes} vote{totalVotes !== 1 ? "s" : ""} · {poll.active ? "Open" : "Closed"}</div></div>); }
     if (msg.deleted) return <span style={{ opacity: 0.6, fontStyle: "italic", fontSize: 13 }}>🚫 This message was deleted</span>;
     if (msg.type === "CALL") return (<div style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.85 }}><IcoPhone color={msg.sender === name ? "#fff" : "var(--accent)"} size={14} /><span style={{ fontSize: 13 }}>{msg.content}</span></div>);
     const resolveUrl = (url) => { if (!url) return ""; if (url.startsWith("http")) { const path = url.replace(/^https?:\/\/[^/]+/, ""); return `http://192.168.108.132:8080${path}`; } return `http://192.168.108.132:8080${url.startsWith("/") ? "" : "/"}${url}`; };
@@ -1114,12 +1406,18 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === keybinds.closeModal || e.key === "Escape") { if (editingMsg) { setEditingMsg(null); setEditText(""); setMessage(""); return; } if (showSettings) { setShowSettings(false); return; } if (showProfile) { setShowProfile(false); return; } if (showCreateRoom) { setShowCreateRoom(false); return; } if (showMsgSearch) { setShowMsgSearch(false); setMsgSearchQ(""); setMsgSearchResults([]); return; } if (showEmoji) { setShowEmoji(false); return; } }
-      if (e.key === keybinds.openSettings && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") { setShowSettings(true); }
+      if (e.key !== "Escape") return;
+      if (editingMsg)     { setEditingMsg(null); setEditText(""); setMessage(""); return; }
+      if (showSettings)   { setShowSettings(false); return; }
+      if (showProfile)    { setShowProfile(false); return; }
+      if (showCreateRoom) { setShowCreateRoom(false); return; }
+      if (showMsgSearch)  { setShowMsgSearch(false); setMsgSearchQ(""); setMsgSearchResults([]); return; }
+      if (showEmoji)      { setShowEmoji(false); return; }
+      if (showMoodPicker) { setShowMoodPicker(false); return; }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [keybinds, editingMsg, showSettings, showProfile, showCreateRoom, showMsgSearch, showEmoji]);
+  }, [editingMsg, showSettings, showProfile, showCreateRoom, showMsgSearch, showEmoji, showMoodPicker]);
 
   if (callMode === "video") return (<><style>{buildCSS(dark)}</style><CallOverlay key={callKey} mode="video" myName={name} isCaller={isCaller} stompClient={stompClient} onEnd={endCall} /></>);
 
@@ -1171,9 +1469,16 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(168,85,247,0.5)", padding: "14px 10px 5px", display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 8, opacity: 0.6 }}>✦</span> Online — {onlineUsers.filter(u => u === name || friends.includes(u)).length}</div>
               {onlineUsers.filter(u => u === name || friends.includes(u)).map((user, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, marginBottom: 2 }}><div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{user[0].toUpperCase()}<div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: "#10b981", border: "2px solid var(--glass2)", boxShadow: "0 0 5px #10b981" }} /></div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user}{user === name ? " (you)" : ""}</div><div style={{ fontSize: 11, color: "#10b981" }}>{typingUsers.includes(user) ? "✍️ typing…" : (moodMap[user]?.emoji || "●") + " " + (moodMap[user]?.mood || "Active")}</div></div></div>))}
             </div>
-            <div style={{ padding: "10px 12px", borderTop: "1px solid var(--divider)", display: "flex", alignItems: "center", gap: 9, flexShrink: 0, background: "var(--glass2)" }}>
-              <div onClick={() => setShowProfile(true)} style={{ position: "relative", width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0, overflow: "hidden" }}>{myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.108.132:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} /> : name[0]?.toUpperCase()}<div style={{ position: "absolute", bottom: 1, right: 1, width: 9, height: 9, borderRadius: "50%", background: "#10b981", border: "2px solid var(--glass2)", boxShadow: "0 0 5px #10b981" }} /></div>
-              <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => setShowProfile(true)}><div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{myProfile?.displayName || name}</div><div style={{ fontSize: 11, color: "#10b981", display: "flex", alignItems: "center", gap: 4 }}><select value={myMood} onChange={e => { const m = e.target.value; setMyMood(m); fetch("http://192.168.100.127:8080/auth/mood", { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ mood: m }) }).catch(() => {}); }} style={{ background: "transparent", border: "none", color: "#10b981", fontSize: 11, cursor: "pointer", outline: "none", fontFamily: "inherit", padding: 0 }}><option value="ONLINE">🟢 Online</option><option value="FOCUSED">🎯 Focused</option><option value="GAMING">🎮 Gaming</option><option value="STUDYING">📚 Studying</option><option value="BUSY">🔴 Busy</option><option value="CHILL">😎 Chill</option><option value="INVISIBLE">👻 Invisible</option></select></div></div>
+            <div style={{ padding: "10px 12px", borderTop: "1px solid var(--divider)", display: "flex", alignItems: "center", gap: 9, flexShrink: 0, background: "var(--glass2)", position: "relative" }}>
+              {showMoodPicker && (
+                <div style={{ position: "absolute", bottom: "52px", left: 8, zIndex: 300, background: "var(--glass2)", border: "1px solid var(--glass-border)", borderRadius: 14, padding: "8px 6px", display: "flex", gap: 4, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", backdropFilter: "blur(20px)" }}>
+                  {[{v:"ONLINE",e:"🟢"},{v:"FOCUSED",e:"🎯"},{v:"GAMING",e:"🎮"},{v:"STUDYING",e:"📚"},{v:"BUSY",e:"🔴"},{v:"CHILL",e:"😎"},{v:"INVISIBLE",e:"👻"}].map(m => (
+                    <button key={m.v} title={m.v} onClick={e => { e.stopPropagation(); fetch(`http://192.168.108.132:8080/auth/mood`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ mood: m.v }) }).catch(() => {}); setShowMoodPicker(false); }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 20, width: 36, height: 36, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.1s" }} onMouseEnter={ev => ev.currentTarget.style.background = "var(--accent-soft)"} onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}>{m.e}</button>
+                  ))}
+                </div>
+              )}
+              <div onClick={() => setShowProfile(true)} style={{ position: "relative", width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0, overflow: "hidden" }}>{myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.108.132:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} /> : name[0]?.toUpperCase()}<div onClick={e => { e.stopPropagation(); setShowMoodPicker(v => !v); }} title="Set mood" style={{ position: "absolute", bottom: 1, right: 1, width: 12, height: 12, borderRadius: "50%", background: "#10b981", border: "2px solid var(--glass2)", boxShadow: "0 0 5px #10b981", cursor: "pointer" }} /></div>
+              <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => setShowProfile(true)}><div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{myProfile?.displayName || name}</div><div style={{ fontSize: 11, color: "#10b981" }}>● Online</div></div>
               <button onClick={e => { e.stopPropagation(); setShowSettings(true); }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 15, padding: "3px", opacity: 0.6, borderRadius: 6 }} title="Settings">⚙️</button>
               <button onClick={e => { e.stopPropagation(); if (callMode) endCall(0); stompClient.current?.deactivate(); onLogout(); }} style={{ background: "rgba(251,113,133,0.12)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 8, color: "#fb7185", fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}>Out</button>
             </div>
@@ -1209,7 +1514,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
                     <div className="msg-row">{!me && <div className="mini-av">{initial(msg.sender)}</div>}
                       <div className={`msg-bubble${msg.type === "IMAGE" ? " is-image" : ""}${msg.deleted ? " deleted" : ""}`} style={{ fontSize: { small: 12, medium: 14.5, large: 17 }[fontSize] || 14.5, padding: compactMode ? "5px 10px" : { small: "8px 12px", medium: "11px 15px", large: "13px 18px" }[fontSize] || "11px 15px", borderRadius: { rounded: 22, sharp: 6, minimal: 14 }[bubbleStyle] || 22 }}>
                         {renderContent(msg)}
-                        {msg.edited && (<div style={{ fontSize: 10, opacity: 0.5, marginTop: 2, cursor: "pointer", textDecoration: "underline" }} onClick={() => fetch(`http://192.168.100.127:8080/messages/${msg.id}/history?type=CHANNEL`, { headers: { Authorization: `Bearer ${authToken}` } }).then(r => r.json()).then(d => alert("Edit history:\n\n" + (d.history || []).map(h => `Edit ${h.editNumber} by ${h.editedBy}:\n"${h.previousContent}"`).join("\n\n") || "No history found")).catch(() => alert("Could not load history"))}>(edited {msg.editCount > 1 ? `${msg.editCount} times` : ""})</div>)}                        {!msg.deleted && (<div className="msg-actions"><button className="action-btn" title="React" onClick={() => sendReaction(msg.id, "❤️")}><span style={{ fontSize: 13 }}>❤️</span></button><button className="action-btn" title="React 👍" onClick={() => sendReaction(msg.id, "👍")}><span style={{ fontSize: 13 }}>👍</span></button>{me && !msg.deleted && !msg.fileUrl && (!msg.type || msg.type === "TEXT") && (<button className="action-btn" title="Edit" onClick={() => startEdit(msg)}><IcoEdit color={IC} size={14} /></button>)}{me && !msg.deleted && <button className="action-btn" title="Delete" onClick={() => deleteMessage(msg.id)}><IcoTrash size={14} /></button>}</div>)}
+                        {msg.edited && (<div style={{ fontSize: 10, opacity: 0.5, marginTop: 2, cursor: "pointer", textDecoration: "underline" }} onClick={() => fetch(`http://192.168.108.132:8080/messages/${msg.id}/history?type=CHANNEL`, { headers: { Authorization: `Bearer ${authToken}` } }).then(r => r.json()).then(d => alert("Edit history:\n\n" + (d.history || []).map(h => `Edit ${h.editNumber} by ${h.editedBy}:\n"${h.previousContent}"`).join("\n\n") || "No history found")).catch(() => alert("Could not load history"))}>(edited {msg.editCount > 1 ? `${msg.editCount} times` : ""})</div>)}                        {!msg.deleted && (<div className="msg-actions"><button className="action-btn" title="React" onClick={() => sendReaction(msg.id, "❤️")}><span style={{ fontSize: 13 }}>❤️</span></button><button className="action-btn" title="React 👍" onClick={() => sendReaction(msg.id, "👍")}><span style={{ fontSize: 13 }}>👍</span></button>{me && !msg.deleted && !msg.fileUrl && (!msg.type || msg.type === "TEXT") && (<button className="action-btn" title="Edit" onClick={() => startEdit(msg)}><IcoEdit color={IC} size={14} /></button>)}{me && !msg.deleted && <button className="action-btn" title="Delete" onClick={() => deleteMessage(msg.id)}><IcoTrash size={14} /></button>}</div>)}
                       </div>
                     </div>
                     {msgReactions.length > 0 && (<div className="reactions-row" style={{ paddingLeft: me ? 0 : 34 }}>{msgReactions.map((r, ri) => (<button key={ri} className={`reaction-chip${r.users.includes(name) ? " mine" : ""}`} onClick={() => sendReaction(msg.id, r.emoji)} title={r.users.join(", ")}>{r.emoji}<span className="reaction-count">{r.count}</span></button>))}</div>)}
@@ -1251,7 +1556,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
           </div>
         )}
       </div>
-      {showSettings && (<SettingsModal onClose={() => setShowSettings(false)} keybinds={keybinds} saveKeybinds={saveKeybinds} tab={settingsTab} setTab={setSettingsTab} dark={dark} setDark={setDark} authToken={authToken} authUser={authUser} myProfile={myProfile} onUpdateProfile={(data) => setMyProfile(prev => ({ ...prev, ...data }))} fontSize={fontSize} setFontSize={(v) => { setFontSize(v); localStorage.setItem("fontSize", v); }} bubbleStyle={bubbleStyle} setBubbleStyle={(v) => { setBubbleStyle(v); localStorage.setItem("bubbleStyle", v); }} notifSound={notifSound} setNotifSound={(v) => { setNotifSound(v); localStorage.setItem("notifSound", String(v)); }} compactMode={compactMode} setCompactMode={(v) => { setCompactMode(v); localStorage.setItem("compactMode", String(v)); }} privacyDm={privacyDm} setPrivacyDm={(v) => { setPrivacyDm(v); localStorage.setItem("privacyDm", v); }} privacyFriend={privacyFriend} setPrivacyFriend={(v) => { setPrivacyFriend(v); localStorage.setItem("privacyFriend", v); }} onLogout={onLogout} onEndCall={() => { if (callMode) endCall(0); }} />)}
+      {showSettings && (<SettingsModal onClose={() => setShowSettings(false)} tab={settingsTab} setTab={setSettingsTab} dark={dark} setDark={setDark} authToken={authToken} authUser={authUser} myProfile={myProfile} onUpdateProfile={(data) => setMyProfile(prev => ({ ...prev, ...data }))} fontSize={fontSize} setFontSize={(v) => { setFontSize(v); localStorage.setItem("fontSize", v); }}  notifSound={notifSound} setNotifSound={(v) => { setNotifSound(v); localStorage.setItem("notifSound", String(v)); }} compactMode={compactMode} setCompactMode={(v) => { setCompactMode(v); localStorage.setItem("compactMode", String(v)); }} privacyDm={privacyDm} setPrivacyDm={(v) => { setPrivacyDm(v); localStorage.setItem("privacyDm", v); }} privacyFriend={privacyFriend} setPrivacyFriend={(v) => { setPrivacyFriend(v); localStorage.setItem("privacyFriend", v); }} onLogout={onLogout} onEndCall={() => { if (callMode) endCall(0); }} />)}
       {showCreateRoom && <CreateRoomModal onClose={() => setShowCreateRoom(false)} onCreate={createRoom} />}
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} authToken={authToken} user={{ ...myProfile, username: name }} onUpdate={(data) => setMyProfile(prev => ({ ...prev, ...data }))} />}
     </>

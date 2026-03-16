@@ -4,7 +4,16 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import jakarta.persistence.*;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Table;
 
 /**
  * User entity — extended for new features:
@@ -55,20 +64,17 @@ public class User {
     private String email;
 
     // ── Mood Status ────────────────────────────────────────────
-    // Default = ONLINE so existing users appear online on login
-    @Column(nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'ONLINE'")
+    @Column(nullable = false, length = 20)
     private String moodStatus = "ONLINE";
 
-    // Optional custom emoji displayed next to the username
     private String moodEmoji;
 
     // ── Role ──────────────────────────────────────────────────
-    // OWNER > ADMIN > MODERATOR > VIP > MEMBER
-    @Column(nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'MEMBER'")
+    @Column(nullable = false, length = 20)
     private String role = "MEMBER";
 
     // ── Moderation ────────────────────────────────────────────
-    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(nullable = false)
     private boolean banned = false;
 
     // null = permanent ban; non-null = temporary ban expiry
@@ -83,7 +89,7 @@ public class User {
     private String banReason;
 
     // ── Security ──────────────────────────────────────────────
-    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(nullable = false)
     private boolean twoFactorEnabled = false;
 
     // TOTP secret — store encrypted in production (use @Convert + AES)
@@ -102,7 +108,7 @@ public class User {
     @Column(name = "friend_username")
     private List<String> friends = new ArrayList<>();
 
-    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(nullable = false)
     private boolean showOnlineStatus = true;
 
     public User() {}
