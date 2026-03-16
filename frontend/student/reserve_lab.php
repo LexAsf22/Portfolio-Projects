@@ -2,24 +2,43 @@
 include("../includes/header.php");
 checkRole('student');
 
-// Handle submission
-if(isset($_POST['reserve'])){
-    $lab_id = $_POST['lab'];
-    $date = $_POST['date'];
+if (isset($_POST['reserve'])) {
+    $lab_id    = (int) $_POST['lab'];
+    $date      = $_POST['date'];
     $time_slot = $_POST['time_slot'];
-    $user_id = $_SESSION['user']['id'];
+    $user_id   = (int) $_SESSION['user']['id'];
 
-    // Check conflict
-    $check = $conn->query("SELECT * FROM reservations WHERE lab_id=$lab_id AND date='$date' AND time_slot='$time_slot'");
-    if($check->num_rows > 0){
-        setFlash("Selected slot is already booked!", "error");
+    // Validate date is not in the past
+    if ($date < date('Y-m-d')) {
+        setFlash("Please select a future date.", "error");
     } else {
-        $conn->query("INSERT INTO reservations(user_id, lab_id, date, time_slot, status) VALUES($user_id,$lab_id,'$date','$time_slot','Pending')");
-        setFlash("Reservation request submitted!", "success");
+        // Check conflict — use prepared statement
+        $check = $conn->prepare("
+            SELECT id FROM reservations 
+            WHERE lab_id = ? AND date = ? AND time_slot = ?
+        ");
+        $check->bind_param("iss", $lab_id, $date, $time_slot);
+        $check->execute();
+        $check->store_result();
+
+        if ($check->num_rows > 0) {
+            setFlash("Selected slot is already booked!", "error");
+        } else {
+            $stmt = $conn->prepare("
+                INSERT INTO reservations (user_id, lab_id, date, time_slot, status) 
+                VALUES (?, ?, ?, ?, 'Pending')
+            ");
+            $stmt->bind_param("iiss", $user_id, $lab_id, $date, $time_slot);
+            $stmt->execute();
+            setFlash("Reservation request submitted!", "success");
+        }
     }
+
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
 }
 
-$labs = $conn->query("SELECT * FROM laboratories");
+$labs = $conn->query("SELECT * FROM laboratories ORDER BY lab_name");
 ?>
 
 <h2>Reserve Lab</h2>
@@ -28,26 +47,30 @@ $labs = $conn->query("SELECT * FROM laboratories");
 <form method="POST" id="reserveLabForm">
     <select name="lab" required>
         <option value="">Select Lab</option>
-        <?php while($lab = $labs->fetch_assoc()){ ?>
-        <option value="<?php echo $lab['id']; ?>"><?php echo $lab['lab_name']; ?></option>
-        <?php } ?>
+        <?php while ($lab = $labs->fetch_assoc()): ?>
+            <option value="<?php echo $lab['id']; ?>">
+                <?php echo htmlspecialchars($lab['lab_name']); ?>
+            </option>
+        <?php endwhile; ?>
     </select>
-    <input type="date" name="date" required>
+
+    <input type="date" name="date" min="<?php echo date('Y-m-d'); ?>" required>
+
     <select name="time_slot" required>
         <option value="">Select Time Slot</option>
-        <option value="7:30-9:00">7:30-9:00</option>
-        <option value="9:00-10:30">9:00-10:30</option>
-        <option value="10:30-12:00">10:30-12:00</option>
-        <option value="13:00-14:30">13:00-14:30</option>
-        <option value="14:30-16:00">14:30-16:00</option>
+        <option value="7:30-9:00">7:30 - 9:00</option>
+        <option value="9:00-10:30">9:00 - 10:30</option>
+        <option value="10:30-12:00">10:30 - 12:00</option>
+        <option value="13:00-14:30">13:00 - 14:30</option>
+        <option value="14:30-16:00">14:30 - 16:00</option>
     </select>
+
     <button name="reserve" type="submit">Reserve</button>
 </form>
 
 <script>
-// JS: confirm before submitting
-document.getElementById('reserveLabForm').addEventListener('submit', function(e){
-    if(!confirm("Submit reservation request?")) e.preventDefault();
+document.getElementById('reserveLabForm').addEventListener('submit', function(e) {
+    if (!confirm("Submit reservation request?")) e.preventDefault();
 });
 </script>
 

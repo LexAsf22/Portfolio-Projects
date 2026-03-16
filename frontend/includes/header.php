@@ -2,10 +2,19 @@
 // frontend/includes/header.php
 include("../../backend/config/auth.php");
 include("../../backend/config/database.php");
+include("../../frontend/includes/flash.php"); // ← add this
 checkLogin(); // ensure the user is logged in
 
 $user = $_SESSION['user'];
 $role = $user['role'];
+
+// Each role has their own dashboard
+$dashboards = [
+    'student' => '/spacio/frontend/student/dashboard.php',
+    'teacher' => '/spacio/frontend/teacher/dashboard.php',
+    'admin'   => '/spacio/frontend/admin/dashboard.php',
+];
+$dashboardLink = $dashboards[$role] ?? '/spacio/login.php';
 ?>
 
 <!DOCTYPE html>
@@ -46,7 +55,7 @@ $role = $user['role'];
 <div class="sidebar">
     <h3><?php echo ucfirst($role); ?> Menu</h3>
 
-    <a href="../../dashboard.php">Dashboard</a>
+    <a href="<?php echo $dashboardLink; ?>">Dashboard</a>
 
     <?php if($role == "student"){ ?>
         <a href="../student/reserve_lab.php">Reserve Lab</a>
@@ -68,7 +77,7 @@ $role = $user['role'];
         <a href="../admin/reports.php">Reports & Analytics</a>
     <?php } ?>
 
-    <a href="../../logout.php" style="margin-top:20px; color:#ffdddd;">Logout</a>
+    <a href="/spacio/logout.php" class="logout-link">&#x2192; Logout</a>
 </div>
 
 <div class="content">
