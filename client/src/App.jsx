@@ -12,18 +12,18 @@ export default function App() {
 
   // Persist auth across page refreshes — same key as the original file
   const [auth, setAuth] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("nexus_auth") || "null"); }
+    try { return JSON.parse(localStorage.getItem("cosmo_auth") || "null"); }
     catch { return null; }
   });
 
   // LandingPage shows the auth modal internally; it calls these two callbacks
   const handleAuth = (data) => {
-    localStorage.setItem("nexus_auth", JSON.stringify(data));
+    localStorage.setItem("cosmo_auth", JSON.stringify(data));
     setAuth(data);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("nexus_auth");
+    localStorage.removeItem("cosmo_auth");
     setAuth(null);
   };
 
