@@ -101,8 +101,6 @@ if (isset($_POST['reserve'])) {
                 font-size:1rem; cursor:pointer;
                 transition: background .2s;
             "
-            onmouseover="this.style.background='#1e3d1a'"
-            onmouseout="this.style.background='#2c5f2e'"
         >
             Submit Reservation
         </button>
@@ -170,8 +168,38 @@ if (isset($_POST['reserve'])) {
 
 <script>
 document.getElementById('reserveEqForm').addEventListener('submit', function(e) {
-    if (!confirm("Submit this equipment reservation?")) e.preventDefault();
+    // Check equipment is selected
+    var equipment = document.querySelector('select[name="equipment"]').value;
+    if (!equipment) {
+        alert('Please select an equipment item.');
+        e.preventDefault();
+        return;
+    }
+
+    // Check date is selected
+    var date = document.querySelector('input[name="date"]').value;
+    if (!date) {
+        alert('Please select a date.');
+        e.preventDefault();
+        return;
+    }
+
+    // Final confirm before submitting
+    if (!confirm('Submit this equipment reservation?')) {
+        e.preventDefault();
+    }
 });
+
+// Remove inline onmouseover/onmouseout — handle hover in JS instead
+var submitBtn = document.querySelector('#reserveEqForm button[type="submit"]');
+if (submitBtn) {
+    submitBtn.addEventListener('mouseover', function() {
+        this.style.background = '#1e3d1a';
+    });
+    submitBtn.addEventListener('mouseout', function() {
+        this.style.background = '#2c5f2e';
+    });
+}
 </script>
 
 <?php include("../includes/footer.php"); ?> 

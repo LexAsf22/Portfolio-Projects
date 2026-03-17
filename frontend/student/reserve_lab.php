@@ -121,8 +121,6 @@ if (isset($_POST['reserve'])) {
                 font-size:1rem; cursor:pointer;
                 transition: background .2s;
             "
-            onmouseover="this.style.background='#1e3d1a'"
-            onmouseout="this.style.background='#2c5f2e'"
         >
             Submit Reservation
         </button>
@@ -188,48 +186,100 @@ if (isset($_POST['reserve'])) {
 </div>
 
 <script>
+var labSelect  = document.querySelector('select[name="lab"]');
+var dateInput  = document.querySelector('input[name="date"]');
+var slotSelect = document.querySelector('select[name="time_slot"]');
+var msg        = document.getElementById('availabilityMsg');
+var slotTaken  = false; // tracks if current slot is confirmed unavailable
+
+// Form validation + guard against booking a known-unavailable slot
 document.getElementById('reserveLabForm').addEventListener('submit', function(e) {
-    if (!confirm("Submit this lab reservation request?")) e.preventDefault();
+    if (!labSelect.value) {
+        alert('Please select a lab.');
+        e.preventDefault();
+        return;
+    }
+    if (!dateInput.value) {
+        alert('Please select a date.');
+        e.preventDefault();
+        return;
+    }
+    if (!slotSelect.value) {
+        alert('Please select a time slot.');
+        e.preventDefault();
+        return;
+    }
+    if (slotTaken) {
+        alert('That slot is already booked. Please choose a different time or date.');
+        e.preventDefault();
+        return;
+    }
+    if (!confirm('Submit this lab reservation request?')) {
+        e.preventDefault();
+    }
 });
 
-// Live availability check when lab + date + time are all selected
-const labSelect  = document.querySelector('select[name="lab"]');
-const dateInput  = document.querySelector('input[name="date"]');
-const slotSelect = document.querySelector('select[name="time_slot"]');
-const msg        = document.getElementById('availabilityMsg');
-
+// Live availability check using your existing check_availability.php
 function checkAvailability() {
-    const lab  = labSelect.value;
-    const date = dateInput.value;
-    const slot = slotSelect.value;
+    var lab  = labSelect.value;
+    var date = dateInput.value;
+    var slot = slotSelect.value;
 
+    // Only check when all three fields are filled
     if (!lab || !date || !slot) {
         msg.style.display = 'none';
+        slotTaken = false;
         return;
     }
 
-    fetch(`/spacio/backend/api/check_availability.php?lab_id=${lab}&date=${date}&time_slot=${encodeURIComponent(slot)}`)
-        .then(res => res.json())
-        .then(data => {
+    // Show loading state while fetch is in progress
+    msg.style.display    = 'block';
+    msg.style.background = '#f0f0f0';
+    msg.style.color      = '#555';
+    msg.style.border     = '1px solid #ccc';
+    msg.textContent      = 'Checking availability...';
+
+    fetch('/spacio/backend/api/check_availability.php?lab_id=' + lab +
+          '&date=' + date +
+          '&time_slot=' + encodeURIComponent(slot))
+        .then(function(res) {
+            if (!res.ok) throw new Error('Server error');
+            return res.json();
+        })
+        .then(function(data) {
             msg.style.display = 'block';
             if (data.available) {
                 msg.style.background = '#d4edda';
                 msg.style.color      = '#155724';
                 msg.style.border     = '1px solid #c3e6cb';
                 msg.textContent      = '✓ This slot is available!';
+                slotTaken = false;
             } else {
                 msg.style.background = '#f8d7da';
                 msg.style.color      = '#721c24';
                 msg.style.border     = '1px solid #f5c6cb';
                 msg.textContent      = '✗ This slot is already booked. Please choose another.';
+                slotTaken = true; // prevent form submit
             }
         })
-        .catch(() => { msg.style.display = 'none'; });
+        .catch(function() {
+            // If check fails, hide the message and allow submit
+            // PHP will do the final availability check anyway
+            msg.style.display = 'none';
+            slotTaken = false;
+        });
 }
 
 labSelect.addEventListener('change', checkAvailability);
 dateInput.addEventListener('change', checkAvailability);
 slotSelect.addEventListener('change', checkAvailability);
+
+// Remove inline hover handlers — handle in JS
+var submitBtn = document.querySelector('#reserveLabForm button[type="submit"]');
+if (submitBtn) {
+    submitBtn.addEventListener('mouseover', function() { this.style.background = '#1e3d1a'; });
+    submitBtn.addEventListener('mouseout',  function() { this.style.background = '#2c5f2e'; });
+}
 </script>
 
 <?php include("../includes/footer.php"); ?>

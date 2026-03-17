@@ -42,14 +42,33 @@ $computers = $conn->query("
         <?php endwhile; ?>
     <?php endif; ?>
     </tbody>
+    <div id="compHint" style="display:none; color:#888; font-style:italic; margin-top:8px;">
+            No computers match your search.
+    </div>  
 </table>
 
 <script>
-document.getElementById('searchComp').addEventListener('keyup', function () {
-    const filter = this.value.toLowerCase();
-    document.querySelectorAll('#compTable tbody tr').forEach(row => {
-        row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
+document.getElementById('searchComp').addEventListener('keyup', function() {
+    var filter  = this.value.toLowerCase();
+    var rows    = document.querySelectorAll('#compTable tbody tr');
+    var visible = 0;
+
+    rows.forEach(function(row) {
+        // Skip the "no computers on record" empty-state row
+        if (row.cells.length < 3) return;
+
+        if (row.textContent.toLowerCase().includes(filter)) {
+            row.style.display = '';
+            visible++;
+        } else {
+            row.style.display = 'none';
+        }
     });
+
+    var hint = document.getElementById('compHint');
+    if (hint) {
+        hint.style.display = visible === 0 ? 'block' : 'none';
+    }
 });
 </script>
 

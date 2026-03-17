@@ -37,8 +37,8 @@ if(isset($_GET['fetch_stats'])){
 }
 
 // Normal page load
-$available_labs = $conn->query("SELECT * FROM laboratories")->num_rows;
-$active_reservations = $conn->query("SELECT * FROM reservations WHERE user_id=$user_id AND status='Approved'")->num_rows;
+$available_labs = $conn->query("SELECT COUNT(*) AS n FROM laboratories")->fetch_assoc()['n'];
+$active_reservations = $conn->query("SELECT COUNT(*) AS n FROM reservations WHERE user_id=$user_id AND status='Approved'")->fetch_assoc()['n'];
 
 $upcoming = $conn->query("SELECT r.*, l.lab_name 
     FROM reservations r 
@@ -91,63 +91,70 @@ style="padding:10px;margin:10px 0;width:50%;"
 </table>
 
 <script>
+function refreshDashboard() {
+    fetch(window.location.pathname + '?fetch_stats=1')
+        .then(function(res) {
+            if (!res.ok) throw new Error('Server error');
+            return res.json();
+        })
+        .then(function(data) {
+            // Use textContent — never innerHTML — to prevent XSS
+            document.getElementById('availableLabs').textContent    = data.labs;
+            document.getElementById('activeReservations').textContent = data.active;
 
-// Refresh dashboard data
-function refreshDashboard(){
+            var table = document.getElementById('upcomingTable');
 
-fetch(window.location.pathname + "?fetch_stats=1")
-.then(res => res.json())
-.then(data => {
+            // Remove all rows except the header
+            var oldRows = table.querySelectorAll('tr:not(:first-child)');
+            oldRows.forEach(function(r) { r.remove(); });
 
-document.getElementById("availableLabs").textContent = data.labs;
-document.getElementById("activeReservations").textContent = data.active;
+            // Show empty message if no upcoming reservations
+            if (data.rows.length === 0) {
+                var empty = document.createElement('tr');
+                var td    = document.createElement('td');
+                td.colSpan   = 4;
+                td.textContent = 'No upcoming reservations.';
+                td.style.cssText = 'text-align:center; color:#888; font-style:italic;';
+                empty.appendChild(td);
+                table.appendChild(empty);
+                return;
+            }
 
-const table = document.getElementById("upcomingTable");
-const rows = table.querySelectorAll("tr:not(:first-child)");
-rows.forEach(r => r.remove());
+            // Build each row safely using createElement (not innerHTML)
+            data.rows.forEach(function(r) {
+                var tr = document.createElement('tr');
 
-data.rows.forEach(r => {
+                var cells = [r.lab, r.date, r.time, r.status];
+                cells.forEach(function(val) {
+                    var td = document.createElement('td');
+                    td.textContent = val; // textContent escapes HTML automatically
+                    tr.appendChild(td);
+                });
 
-const tr = document.createElement("tr");
-
-tr.innerHTML = `
-<td>${r.lab}</td>
-<td>${r.date}</td>
-<td>${r.time}</td>
-<td>${r.status}</td>
-`;
-
-table.appendChild(tr);
-
-});
-
-});
+                table.appendChild(tr);
+            });
+        })
+        .catch(function(err) {
+            console.error('Dashboard refresh failed:', err);
+        });
 }
 
-// Auto refresh every 60 seconds
+// Auto-refresh every 60 seconds
 setInterval(refreshDashboard, 60000);
 
-
 // Search filter with debounce
-let debounce;
-
-document.getElementById("searchReservations").addEventListener("keyup", function(){
-
-clearTimeout(debounce);
-
-debounce = setTimeout(()=>{
-
-const filter = this.value.toLowerCase();
-const rows = document.querySelectorAll("#upcomingTable tr:not(:first-child)");
-
-rows.forEach(row=>{
-row.style.display = row.textContent.toLowerCase().includes(filter) ? "" : "none";
+var debounceTimer;
+document.getElementById('searchReservations').addEventListener('keyup', function() {
+    clearTimeout(debounceTimer);
+    var searchValue = this.value; // capture before timeout fires
+    debounceTimer = setTimeout(function() {
+        var filter = searchValue.toLowerCase();
+        var rows   = document.querySelectorAll('#upcomingTable tr:not(:first-child)');
+        rows.forEach(function(row) {
+            row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
+        });
+    }, 200);
 });
-
-},200);
-
-});
-
 </script>
 
 <?php include("../includes/footer.php"); ?>

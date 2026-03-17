@@ -2,12 +2,13 @@
 include("../includes/header.php");
 checkRole('admin');
 
+// ── Add equipment ─────────────────────────────────────────────────────────────
 if (isset($_POST['add'])) {
     $lab_id = (int)  $_POST['lab'];
     $name   = trim(  $_POST['equipment_name'] ?? '');
     $qty    = (int)  $_POST['quantity'];
 
-    if ($name === '' || $lab_id === 0 || $qty < 0) {
+    if ($name === '' || $lab_id === 0 || $qty < 1) {
         setFlash("Please fill in all fields correctly.", "error");
     } else {
         $stmt = $conn->prepare("
@@ -22,6 +23,18 @@ if (isset($_POST['add'])) {
     exit;
 }
 
+// ── AJAX: Delete ──────────────────────────────────────────────────────────────
+if (isset($_POST['delete_id'])) {
+    $id   = (int) $_POST['delete_id'];
+    $stmt = $conn->prepare("DELETE FROM equipment WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $success = $stmt->execute();
+    header('Content-Type: application/json');
+    echo json_encode(['success' => $success]);
+    exit;
+}
+
+// ── Non-AJAX delete fallback ──────────────────────────────────────────────────
 if (isset($_GET['delete'])) {
     $id   = (int) $_GET['delete'];
     $stmt = $conn->prepare("DELETE FROM equipment WHERE id = ?");
@@ -37,6 +50,7 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
+// ── Pagination + search query (unchanged from your original) ──────────────────
 $per_page    = 10;
 $page        = max(1, (int) ($_GET['page']       ?? 1));
 $search      = trim(         $_GET['search']     ?? '');
@@ -61,9 +75,9 @@ if ($filter_lab > 0) {
 }
 
 $count_stmt = $conn->prepare("
-    SELECT COUNT(*) AS total 
-    FROM equipment e 
-    JOIN laboratories l ON e.lab_id = l.id 
+    SELECT COUNT(*) AS total
+    FROM equipment e
+    JOIN laboratories l ON e.lab_id = l.id
     $where
 ");
 if ($types !== '') $count_stmt->bind_param($types, ...$params);
@@ -103,6 +117,8 @@ function pageUrl(int $p): string {
     .inv-field label     { display:block; font-size:.72rem; font-weight:700; color:#555; margin-bottom:3px; text-transform:uppercase; letter-spacing:.04em; }
     .inv-field select,
     .inv-field input     { width:100%; padding:7px 9px; border:1px solid #ccc; border-radius:4px; font-size:.88rem; box-sizing:border-box; }
+    .inv-field input.input-error { border-color: #e74c3c; background: #fff5f5; }
+    .inv-field .field-hint { font-size:.72rem; color:#e74c3c; margin-top:3px; min-height:16px; }
 
     .filter-bar          { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
     .filter-bar input    { padding:7px 10px; border:1px solid #ccc; border-radius:4px; font-size:.85rem; width:200px; }
@@ -125,24 +141,15 @@ function pageUrl(int $p): string {
     .badge-red           { background:#f8d7da; color:#721c24; }
     .badge-gray          { background:#e2e3e5; color:#383d41; }
 
-    .btn-delete          { display:inline-block; padding:3px 9px; background:#e74c3c; color:#fff; border-radius:3px; text-decoration:none; font-size:.76rem; }
-    .btn-delete:hover    { background:#c0392b; color:#fff; }
+    .btn-delete          { padding:3px 9px; background:#e74c3c; color:#fff; border-radius:3px; font-size:.76rem; border:none; cursor:pointer; }
+    .btn-delete:hover    { background:#c0392b; }
+    .btn-delete:disabled { opacity:.5; cursor:not-allowed; }
 
-    /* Pagination */
     .pagination          { display:flex; gap:4px; align-items:center; flex-wrap:wrap; margin-top:4px; }
     .pagination a        { padding:5px 10px; border:1px solid #ccc; border-radius:4px; text-decoration:none; color:#333; font-size:.82rem; }
     .pagination a:hover  { background:#f0f0f0; }
     .pagination a.active { background:#2c5f2e; color:#fff; border-color:#2c5f2e; font-weight:700; }
-    /* Disabled arrow style */
-    .pagination .pg-disabled {
-        padding:5px 10px;
-        border:1px solid #eee;
-        border-radius:4px;
-        color:#ccc;
-        font-size:.82rem;
-        cursor:default;
-        user-select:none;
-    }
+    .pagination .pg-disabled { padding:5px 10px; border:1px solid #eee; border-radius:4px; color:#ccc; font-size:.82rem; cursor:default; user-select:none; }
     .pg-info             { font-size:.8rem; color:#777; margin-left:4px; }
 </style>
 
@@ -151,14 +158,15 @@ function pageUrl(int $p): string {
 <h2 style="margin:0 0 14px; font-size:1.2rem;">Inventory Management</h2>
 <?php echo getFlash(); ?>
 
-<!-- ADD FORM -->
+<!-- ── ADD FORM ── -->
 <div class="inv-form">
     <h3>+ Add Equipment</h3>
-    <form method="POST">
+    <form method="POST" id="addEquipForm" novalidate>
         <div class="inv-grid">
+
             <div class="inv-field">
-                <label>Lab</label>
-                <select name="lab" required>
+                <label for="labSelect">Lab</label>
+                <select name="lab" id="labSelect">
                     <option value="">-- Select Lab --</option>
                     <?php
                     $cg = '';
@@ -175,31 +183,38 @@ function pageUrl(int $p): string {
                     <?php endwhile;
                     if ($cg !== '') echo '</optgroup>'; ?>
                 </select>
+                <div class="field-hint" id="labHint"></div>
             </div>
+
             <div class="inv-field">
-                <label>Equipment Name</label>
-                <input type="text" name="equipment_name" placeholder="e.g. Microscope" required>
+                <label for="equipName">Equipment Name</label>
+                <input type="text" name="equipment_name" id="equipName" placeholder="e.g. Microscope">
+                <div class="field-hint" id="nameHint"></div>
             </div>
+
             <div class="inv-field">
-                <label>Quantity</label>
-                <input type="number" name="quantity" placeholder="0" min="1" required>
+                <label for="equipQty">Quantity</label>
+                <input type="number" name="quantity" id="equipQty" placeholder="1" min="1">
+                <div class="field-hint" id="qtyHint"></div>
             </div>
+
         </div>
         <div style="margin-top:10px;">
-            <button name="add" class="btn-green">Add Equipment</button>
+            <button name="add" type="submit" class="btn-green" id="addBtn">Add Equipment</button>
         </div>
     </form>
 </div>
 
-<!-- SEARCH & FILTER -->
-<form method="GET" class="filter-bar">
+<!-- ── SEARCH & FILTER ── -->
+<form method="GET" class="filter-bar" id="filterForm">
     <input
         type="text"
         name="search"
+        id="searchInput"
         value="<?php echo htmlspecialchars($search); ?>"
         placeholder="Search name, lab, status..."
     >
-    <select name="lab_filter">
+    <select name="lab_filter" id="labFilterSelect">
         <option value="">All Labs</option>
         <?php
         $labs2 = $conn->query("SELECT * FROM laboratories ORDER BY campus, lab_name");
@@ -228,8 +243,8 @@ function pageUrl(int $p): string {
     </span>
 </form>
 
-<!-- TABLE -->
-<table class="inv-table">
+<!-- ── TABLE ── -->
+<table class="inv-table" id="invTable">
     <thead>
         <tr>
             <th style="width:36px; text-align:center;">#</th>
@@ -258,14 +273,8 @@ function pageUrl(int $p): string {
                 'Unavailable'       => 'badge-red',
                 default             => 'badge-gray',
             };
-            $delete_url = '?' . http_build_query([
-                'delete'     => $e['id'],
-                'page'       => $page,
-                'search'     => $search,
-                'lab_filter' => $filter_lab,
-            ]);
         ?>
-        <tr>
+        <tr data-id="<?php echo $e['id']; ?>">
             <td style="text-align:center; color:#aaa;"><?php echo $n++; ?></td>
             <td><?php echo htmlspecialchars($e['equipment_name']); ?></td>
             <td><?php echo htmlspecialchars($e['lab_name']);       ?></td>
@@ -276,7 +285,12 @@ function pageUrl(int $p): string {
                 </span>
             </td>
             <td style="text-align:center;">
-                <a href="<?php echo $delete_url; ?>" class="btn-delete deleteBtn">Delete</a>
+                <!-- Changed from <a> to <button> + POST via JS -->
+                <button
+                    class="btn-delete deleteBtn"
+                    data-id="<?php echo $e['id']; ?>"
+                    data-name="<?php echo htmlspecialchars($e['equipment_name']); ?>"
+                >Delete</button>
             </td>
         </tr>
         <?php endwhile; ?>
@@ -284,10 +298,8 @@ function pageUrl(int $p): string {
     </tbody>
 </table>
 
-<!-- PAGINATION -->
+<!-- ── PAGINATION ── -->
 <div class="pagination">
-
-    <!-- First & Prev — disabled on page 1 -->
     <?php if ($page > 1): ?>
         <a href="<?php echo pageUrl(1); ?>">«</a>
         <a href="<?php echo pageUrl($page - 1); ?>">‹</a>
@@ -296,14 +308,12 @@ function pageUrl(int $p): string {
         <span class="pg-disabled">‹</span>
     <?php endif; ?>
 
-    <!-- Page numbers -->
     <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
         <a href="<?php echo pageUrl($i); ?>" <?php echo $i === $page ? 'class="active"' : ''; ?>>
             <?php echo $i; ?>
         </a>
     <?php endfor; ?>
 
-    <!-- Next & Last — disabled on last page -->
     <?php if ($page < $total_pages): ?>
         <a href="<?php echo pageUrl($page + 1); ?>">›</a>
         <a href="<?php echo pageUrl($total_pages); ?>">»</a>
@@ -313,17 +323,122 @@ function pageUrl(int $p): string {
     <?php endif; ?>
 
     <span class="pg-info">Page <?php echo $page; ?> of <?php echo $total_pages; ?></span>
-
 </div>
 
-</div>
+</div><!-- /.inv-wrap -->
 
 <script>
-document.querySelectorAll('.deleteBtn').forEach(btn => {
-    btn.addEventListener('click', e => {
-        if (!confirm("Delete this equipment? This cannot be undone.")) e.preventDefault();
+(function () {
+
+    // ── Add equipment: client-side validation ────────────────────
+
+    const addForm  = document.getElementById('addEquipForm');
+    const labSel   = document.getElementById('labSelect');
+    const nameInp  = document.getElementById('equipName');
+    const qtyInp   = document.getElementById('equipQty');
+    const labHint  = document.getElementById('labHint');
+    const nameHint = document.getElementById('nameHint');
+    const qtyHint  = document.getElementById('qtyHint');
+
+    // Clear error on the field the user is currently fixing
+    labSel.addEventListener('change', () => clearError(labSel,  labHint));
+    nameInp.addEventListener('input', () => clearError(nameInp, nameHint));
+    qtyInp.addEventListener('input',  () => clearError(qtyInp,  qtyHint));
+
+    function showError(input, hint, message) {
+        input.classList.add('input-error');
+        hint.textContent = message;
+    }
+
+    function clearError(input, hint) {
+        input.classList.remove('input-error');
+        hint.textContent = '';
+    }
+
+    addForm.addEventListener('submit', function (e) {
+        let valid = true;
+
+        // Clear previous errors
+        [labSel, nameInp, qtyInp].forEach(el => el.classList.remove('input-error'));
+        [labHint, nameHint, qtyHint].forEach(el => el.textContent = '');
+
+        if (!labSel.value) {
+            showError(labSel, labHint, 'Please select a lab.');
+            valid = false;
+        }
+
+        if (nameInp.value.trim() === '') {
+            showError(nameInp, nameHint, 'Equipment name is required.');
+            valid = false;
+        }
+
+        const qty = parseInt(qtyInp.value, 10);
+        if (isNaN(qty) || qty < 1) {
+            showError(qtyInp, qtyHint, 'Quantity must be at least 1.');
+            valid = false;
+        }
+
+        if (!valid) {
+            e.preventDefault(); // stop form submit, show errors inline
+        }
     });
-});
+
+    // ── Delete: AJAX via POST (safer than GET link) ──────────────
+
+    document.getElementById('invTable')?.addEventListener('click', function (e) {
+        const btn = e.target.closest('.deleteBtn');
+        if (!btn) return;
+
+        const id   = btn.dataset.id;
+        const name = btn.dataset.name;
+
+        if (!confirm('Delete "' + name + '"? This cannot be undone.')) return;
+
+        btn.disabled    = true;
+        btn.textContent = '…';
+
+        // Send as POST with a hidden field instead of a destructive GET URL
+        fetch(window.location.pathname, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'delete_id=' + encodeURIComponent(id),
+        })
+            .then(res => {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(data => {
+                if (!data.success) throw new Error('Delete failed');
+
+                const row = btn.closest('tr');
+                row.style.transition = 'opacity .35s';
+                row.style.opacity    = '0';
+                setTimeout(() => row.remove(), 360);
+            })
+            .catch(err => {
+                btn.disabled    = false;
+                btn.textContent = 'Delete';
+                alert('Could not delete. Please try again.');
+                console.error('Delete failed:', err);
+            });
+    });
+
+    // ── Search: auto-submit after typing stops (debounced) ───────
+    let searchTimeout = null;
+
+    document.getElementById('searchInput')?.addEventListener('keyup', function () {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            document.getElementById('filterForm').submit();
+        }, 400);
+    });
+
+    // ── Lab filter: auto-submit on change ────────────────────────
+    document.getElementById('labFilterSelect')?.addEventListener('change', function () {
+        document.getElementById('filterForm').submit();
+    });
+
+})();
 </script>
 
 <?php include("../includes/footer.php"); ?>

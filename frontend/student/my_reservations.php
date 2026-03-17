@@ -46,6 +46,7 @@ $reservations = $stmt->get_result();
                 <th>Time Slot</th>
                 <th>Status</th>
             </tr>
+            
         </thead>
         <tbody>
         <?php while ($r = $reservations->fetch_assoc()): ?>
@@ -73,17 +74,38 @@ $reservations = $stmt->get_result();
             </tr>
         <?php endwhile; ?>
         </tbody>
+        <div id="searchHint" style="display:none; color:#888; font-style:italic; margin-top:8px;">
+                No reservations match your search.
+        </div>
     </table>
 
 <?php endif; ?>
 
 <script>
-document.getElementById('searchRes')?.addEventListener('keyup', function () {
-    const filter = this.value.toLowerCase();
-    document.querySelectorAll('#myResTable tbody tr').forEach(row => {
-        row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
+// Search filter — only runs if the table exists (user has reservations)
+var searchRes = document.getElementById('searchRes');
+if (searchRes) {
+    searchRes.addEventListener('keyup', function() {
+        var filter  = this.value.toLowerCase();
+        var rows    = document.querySelectorAll('#myResTable tbody tr');
+        var visible = 0;
+
+        rows.forEach(function(row) {
+            if (row.textContent.toLowerCase().includes(filter)) {
+                row.style.display = '';
+                visible++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Show a "no results" hint when search matches nothing
+        var hint = document.getElementById('searchHint');
+        if (hint) {
+            hint.style.display = visible === 0 ? 'block' : 'none';
+        }
     });
-});
+}
 </script>
 
 <?php include("../includes/footer.php"); ?>
