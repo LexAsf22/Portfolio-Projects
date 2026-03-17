@@ -136,10 +136,14 @@ export const fetchRoomHistory = (token, roomId) =>
  * @param {File} file
  * @returns {Promise<string>}  Absolute file URL
  */
-export const uploadFile = async (file) => {
+export const uploadFile = async (file, token) => {
   const fd = new FormData();
   fd.append("file", file);
-  const res = await fetch(API_ROUTES.upload, { method: "POST", body: fd });
+  const headers = {};
+  const resolvedToken = token || localStorage.getItem("token");
+  if (resolvedToken) headers.Authorization = `Bearer ${resolvedToken}`;
+  const res = await fetch(API_ROUTES.upload, { method: "POST", headers, body: fd });
+  if (res.status === 401 || res.status === 403) throw new Error("Unauthorized — token may be expired");
   if (!res.ok) throw new Error(`Upload failed — HTTP ${res.status}`);
   return res.text();
 };

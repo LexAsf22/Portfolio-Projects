@@ -21,7 +21,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil,
-                                    CustomUserDetailsService userDetailsService) {
+                                   CustomUserDetailsService userDetailsService) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
     }
@@ -32,10 +32,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Skip JWT check for WebSocket, auth, and upload paths
         String path = request.getRequestURI();
-        if (path.startsWith("/ws") || path.startsWith("/auth") ||
-            path.startsWith("/upload") || path.startsWith("/uploads")) {
+        if (path.equals("/auth/login")      ||
+            path.equals("/auth/register")   ||
+            path.equals("/auth/2fa/verify") ||
+            path.startsWith("/ws")          ||
+            path.startsWith("/upload")      ||
+            path.startsWith("/uploads")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // ✅ FIXED: Only skip truly public endpoints.
+        // Do NOT skip all of /auth/** — protected auth routes need JWT processing.
+        boolean isPublic =
+            path.equals("/auth/login")       ||
+            path.equals("/auth/register")    ||
+            path.equals("/auth/2fa/verify")  ||
+            path.startsWith("/ws")           ||
+            path.startsWith("/upload")       ||
+            path.startsWith("/uploads");
+
+        if (isPublic) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -45,19 +63,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
 
-            if (jwtUtil.validateToken(token)) {
-                String username = jwtUtil.extractUsername(token);
-                UserDetails userDetails =
-                        userDetailsService.loadUserByUsername(username);
+            try {
+                if (jwtUtil.validateToken(token)) {
+                    String username = jwtUtil.extractUsername(token);
+                    UserDetails userDetails =
+                            userDetailsService.loadUserByUsername(username);
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails, null, userDetails.getAuthorities());
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails, null, userDetails.getAuthorities());
 
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request));
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request));
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
+            } catch (Exception e) {
+                // Token is invalid/expired — SecurityContext stays null,
+                // Spring Security will return 401/403 as configured
+                logger.warn("JWT validation failed for path " + path + ": " + e.getMessage());
             }
         }
 

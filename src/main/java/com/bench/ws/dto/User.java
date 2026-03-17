@@ -64,19 +64,18 @@ public class User {
     private String email;
 
     // ── Mood Status ────────────────────────────────────────────
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String moodStatus = "ONLINE";
 
     private String moodEmoji;
 
     // ── Role ──────────────────────────────────────────────────
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String role = "MEMBER";
 
     // ── Moderation ────────────────────────────────────────────
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean banned = false;
-
     // null = permanent ban; non-null = temporary ban expiry
     private LocalDateTime bannedUntil;
 
@@ -89,7 +88,7 @@ public class User {
     private String banReason;
 
     // ── Security ──────────────────────────────────────────────
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean twoFactorEnabled = false;
 
     // TOTP secret — store encrypted in production (use @Convert + AES)
@@ -108,7 +107,7 @@ public class User {
     @Column(name = "friend_username")
     private List<String> friends = new ArrayList<>();
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean showOnlineStatus = true;
 
     public User() {}
