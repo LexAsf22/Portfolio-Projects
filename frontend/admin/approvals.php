@@ -2,73 +2,146 @@
 include("../includes/header.php");
 checkRole('admin');
 
-if(isset($_GET['approve'])){
-    $id = $_GET['approve'];
-    $conn->query("UPDATE reservations SET status='Approved' WHERE id=$id");
-    setFlash("Reservation approved!", "success");
-}
-if(isset($_GET['reject'])){
-    $id = $_GET['reject'];
-    $conn->query("UPDATE reservations SET status='Rejected' WHERE id=$id");
-    setFlash("Reservation rejected!", "error");
+// Approve
+if (isset($_GET['approve'])) {
+    $id   = (int) $_GET['approve'];
+    $stmt = $conn->prepare("UPDATE reservations SET status='Approved' WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    setFlash("Reservation approved successfully!", "success");
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
 }
 
-$reservations = $conn->query("SELECT r.*, u.name as student_name, l.lab_name 
-                               FROM reservations r
-                               JOIN users u ON r.user_id=u.id
-                               JOIN laboratories l ON r.lab_id=l.id
-                               WHERE r.status='Pending'");
+// Reject
+if (isset($_GET['reject'])) {
+    $id   = (int) $_GET['reject'];
+    $stmt = $conn->prepare("UPDATE reservations SET status='Rejected' WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    setFlash("Reservation rejected.", "error");
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+// Fetch all pending — LEFT JOIN equipment too
+$reservations = $conn->query("
+    SELECT 
+        r.*,
+        u.name        AS student_name,
+        l.lab_name,
+        e.equipment_name
+    FROM reservations r
+    JOIN users u ON r.user_id = u.id
+    LEFT JOIN laboratories l ON r.lab_id       = l.id
+    LEFT JOIN equipment    e ON r.equipment_id  = e.id
+    WHERE r.status = 'Pending'
+    ORDER BY r.date ASC, r.time_slot ASC
+");
+
+$pending_count = $reservations->num_rows;
 ?>
 
-<h2>Pending Reservations</h2>
+<h2>Pending Reservations 
+    <span style="
+        background:#f39c12; color:white;
+        padding:3px 10px; border-radius:12px;
+        font-size:.85rem; vertical-align:middle;
+    ">
+        <?php echo $pending_count; ?> pending
+    </span>
+</h2>
+
 <?php echo getFlash(); ?>
 
-<input type="text" id="searchInput" placeholder="Search by student or lab" style="padding:10px;margin-bottom:10px;width:50%;">
-<table id="approvalTable" border="1" cellpadding="10" cellspacing="0" style="border-collapse:collapse;width:100%;">
-<tr>
-<th>ID</th>
-<th>Student</th>
-<th>Lab</th>
-<th>Date</th>
-<th>Time Slot</th>
-<th>Action</th>
-</tr>
-<?php while($row = $reservations->fetch_assoc()){ ?>
-<tr>
-    <td><?php echo $row['id']; ?></td>
-    <td><?php echo $row['student_name']; ?></td>
-    <td><?php echo $row['lab_name']; ?></td>
-    <td><?php echo formatDate($row['date']); ?></td>
-    <td><?php echo $row['time_slot']; ?></td>
-    <td>
-        <a href="?approve=<?php echo $row['id']; ?>" class="approveBtn">Approve</a> | 
-        <a href="?reject=<?php echo $row['id']; ?>" class="rejectBtn">Reject</a>
-    </td>
-</tr>
-<?php } ?>
-</table>
+<?php if ($pending_count === 0): ?>
+    <div style="
+        background:#d4edda; color:#155724;
+        border:1px solid #c3e6cb;
+        padding:16px; border-radius:8px; margin-top:20px;
+    ">
+        ✓ No pending reservations. All caught up!
+    </div>
+<?php else: ?>
+
+    <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="Search by student, lab, or equipment..." 
+        style="padding:10px; margin:10px 0; width:50%; border:1px solid #ccc; border-radius:5px;"
+    >
+
+    <table id="approvalTable" border="1" cellpadding="10" cellspacing="0"
+           style="border-collapse:collapse; width:100%; margin-top:10px;">
+        <thead style="background:#2c5f2e; color:white;">
+            <tr>
+                <th>#</th>
+                <th>Student</th>
+                <th>Type</th>
+                <th>Name</th>
+                <th>Date</th>
+                <th>Time Slot</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php while ($row = $reservations->fetch_assoc()):
+            $isLab = !empty($row['lab_id']);
+            $type  = $isLab ? 'Lab' : 'Equipment';
+            $name  = $isLab ? $row['lab_name'] : $row['equipment_name'];
+        ?>
+            <tr>
+                <td><?php echo $row['id']; ?></td>
+                <td><?php echo htmlspecialchars($row['student_name']); ?></td>
+                <td><?php echo $type; ?></td>
+                <td><?php echo htmlspecialchars($name ?? '—'); ?></td>
+                <td><?php echo date("F d, Y", strtotime($row['date'])); ?></td>
+                <td><?php echo htmlspecialchars($row['time_slot'] ?? '—'); ?></td>
+                <td style="white-space:nowrap;">
+                    <a 
+                        href="?approve=<?php echo $row['id']; ?>" 
+                        class="approveBtn"
+                        style="
+                            background:#28a745; color:white;
+                            padding:6px 14px; border-radius:4px;
+                            text-decoration:none; font-size:.85rem;
+                            margin-right:6px;
+                        "
+                    >✓ Approve</a>
+                    <a 
+                        href="?reject=<?php echo $row['id']; ?>" 
+                        class="rejectBtn"
+                        style="
+                            background:#e74c3c; color:white;
+                            padding:6px 14px; border-radius:4px;
+                            text-decoration:none; font-size:.85rem;
+                        "
+                    >✗ Reject</a>
+                </td>
+            </tr>
+        <?php endwhile; ?>
+        </tbody>
+    </table>
+
+<?php endif; ?>
 
 <script>
-// Confirm Approve/Reject
 document.querySelectorAll('.approveBtn').forEach(btn => {
-    btn.addEventListener('click', function(e){
-        if(!confirm("Are you sure you want to approve this reservation?")) e.preventDefault();
-    });
-});
-document.querySelectorAll('.rejectBtn').forEach(btn => {
-    btn.addEventListener('click', function(e){
-        if(!confirm("Are you sure you want to reject this reservation?")) e.preventDefault();
+    btn.addEventListener('click', e => {
+        if (!confirm("Approve this reservation?")) e.preventDefault();
     });
 });
 
-// Table search
-const searchInput = document.getElementById('searchInput');
-searchInput.addEventListener('keyup', function(){
+document.querySelectorAll('.rejectBtn').forEach(btn => {
+    btn.addEventListener('click', e => {
+        if (!confirm("Reject this reservation?")) e.preventDefault();
+    });
+});
+
+document.getElementById('searchInput')?.addEventListener('keyup', function () {
     const filter = this.value.toLowerCase();
-    const rows = document.querySelectorAll('#approvalTable tr:not(:first-child)');
-    rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(filter) ? '' : 'none';
+    document.querySelectorAll('#approvalTable tbody tr').forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
     });
 });
 </script>
