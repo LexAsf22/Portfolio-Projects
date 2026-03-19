@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spacio — PHP + Django Integration Guide</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg:       #0a0c10;
+  --bg2:      #111318;
+  --bg3:      #181c23;
+  --bg4:      #1e2330;
+  --border:   #262d3d;
+  --border2:  #2e3850;
+  --text:     #d8e0f0;
+  --muted:    #6a7a99;
+  --dim:      #4a566e;
+  --blue:     #4d9cff;
+  --blue-dim: #1a3566;
+  --green:    #3ecf70;
+  --green-dim:#0e3320;
+  --orange:   #ff9b4d;
+  --orange-dim:#3d2200;
+  --purple:   #b07eff;
+  --purple-dim:#2a1660;
+  --red:      #ff5f5f;
+  --red-dim:  #3d0e0e;
+  --yellow:   #f0c040;
+  --yellow-dim:#332800;
+  --teal:     #30d5c8;
+  --teal-dim: #0a2e2c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.75;
+  display: flex;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 270px;
+  min-width: 270px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-logo {
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.sidebar-logo .brand {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--blue);
+  letter-spacing: -0.3px;
+}
+.sidebar-logo .sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+.nav-group { margin-bottom: 8px; }
+
+.nav-group-label {
+  padding: 6px 20px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--dim);
+}
+
+.nav-item {
+  display: block;
+  padding: 7px 20px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: all 0.15s;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.nav-item:hover { color: var(--text); background: var(--bg3); }
+.nav-item.active { color: var(--blue); border-left-color: var(--blue); background: rgba(77,156,255,0.06); }
+
+.nav-badge {
+  float: right;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.badge-blue   { background: var(--blue-dim);   color: var(--blue); }
+.badge-green  { background: var(--green-dim);  color: var(--green); }
+.badge-orange { background: var(--orange-dim); color: var(--orange); }
+.badge-purple { background: var(--purple-dim); color: var(--purple); }
+
+/* MAIN CONTENT */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  height: 100vh;
+}
+
+.content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 48px 48px 96px;
+}
+
+/* PAGE HEADER */
+.page-header {
+  margin-bottom: 48px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.breadcrumb {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 16px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.breadcrumb span { color: var(--dim); margin: 0 6px; }
+
+.page-header h1 {
+  font-size: 34px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+
+.page-header .tagline {
+  font-size: 16px;
+  color: var(--muted);
+  font-weight: 300;
+  max-width: 600px;
+}
+
+.meta-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.meta-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--muted);
+}
+.meta-pill .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+}
+.dot-php    { background: #8892be; }
+.dot-django { background: #0c4b33; border: 1.5px solid #44b78b; }
+.dot-green  { background: var(--green); }
+.dot-blue   { background: var(--blue); }
+
+/* SECTION */
+.section {
+  margin-bottom: 60px;
+  scroll-margin-top: 32px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-num {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: var(--blue-dim);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  flex-shrink: 0;
+}
+
+.section-num.green  { background: var(--green-dim);  color: var(--green); }
+.section-num.orange { background: var(--orange-dim); color: var(--orange); }
+.section-num.purple { background: var(--purple-dim); color: var(--purple); }
+.section-num.red    { background: var(--red-dim);    color: var(--red); }
+.section-num.yellow { background: var(--yellow-dim); color: var(--yellow); }
+.section-num.teal   { background: var(--teal-dim);   color: var(--teal); }
+
+.section-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.2px;
+}
+
+.section-header .tag {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.tag-important { background: var(--orange-dim); color: var(--orange); }
+.tag-new       { background: var(--green-dim);  color: var(--green); }
+.tag-critical  { background: var(--red-dim);    color: var(--red); }
+
+/* CARDS */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.card-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.card h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 10px;
+  font-size: 11px;
+}
+
+.card p {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.card.blue-accent   { border-left: 3px solid var(--blue);   background: linear-gradient(135deg, rgba(77,156,255,0.04), var(--bg2)); }
+.card.green-accent  { border-left: 3px solid var(--green);  background: linear-gradient(135deg, rgba(62,207,112,0.04), var(--bg2)); }
+.card.orange-accent { border-left: 3px solid var(--orange); background: linear-gradient(135deg, rgba(255,155,77,0.04), var(--bg2)); }
+.card.purple-accent { border-left: 3px solid var(--purple); background: linear-gradient(135deg, rgba(176,126,255,0.04), var(--bg2)); }
+.card.red-accent    { border-left: 3px solid var(--red);    background: linear-gradient(135deg, rgba(255,95,95,0.04), var(--bg2)); }
+.card.yellow-accent { border-left: 3px solid var(--yellow); background: linear-gradient(135deg, rgba(240,192,64,0.04), var(--bg2)); }
+.card.teal-accent   { border-left: 3px solid var(--teal);   background: linear-gradient(135deg, rgba(48,213,200,0.04), var(--bg2)); }
+
+/* MODULE TABLE */
+.module-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+}
+.module-table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.module-table th:first-child { border-radius: 8px 0 0 0; }
+.module-table th:last-child  { border-radius: 0 8px 0 0; }
+.module-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  color: var(--muted);
+}
+.module-table tr:last-child td { border-bottom: none; }
+.module-table tr:hover td { background: var(--bg3); }
+.module-table td:first-child { color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; }
+
+/* TAGS / PILLS */
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-right: 4px;
+}
+.pill-php    { background: rgba(136,146,190,0.15); color: #8892be; }
+.pill-django { background: rgba(68,183,139,0.15); color: #44b78b; }
+.pill-shared { background: rgba(240,192,64,0.15); color: var(--yellow); }
+.pill-drop   { background: rgba(255,95,95,0.15); color: var(--red); }
+.pill-keep   { background: rgba(62,207,112,0.15); color: var(--green); }
+.pill-move   { background: rgba(77,156,255,0.15); color: var(--blue); }
+
+/* CODE BLOCK */
+.code-block {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--bg4);
+  border-bottom: 1px solid var(--border);
+}
+.code-header .file-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.code-header .lang-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.lang-ascii  { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.lang-php    { background: rgba(136,146,190,0.2); color: #8892be; }
+.lang-python { background: rgba(68,183,139,0.2); color: #44b78b; }
+.lang-bash   { background: rgba(240,192,64,0.2); color: var(--yellow); }
+.lang-text   { background: rgba(48,213,200,0.2); color: var(--teal); }
+.code-block pre {
+  padding: 16px 20px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* LIST STYLES */
+.check-list {
+  list-style: none;
+  margin-bottom: 14px;
+}
+.check-list li {
+  padding: 5px 0 5px 24px;
+  position: relative;
+  font-size: 13.5px;
+  color: var(--muted);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.check-list li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: var(--dim);
+  font-size: 11px;
+  top: 7px;
+}
+.check-list li strong { color: var(--text); font-weight: 600; }
+.check-list li.green::before { content: '✓'; color: var(--green); }
+.check-list li.blue::before  { content: '→'; color: var(--blue); }
+.check-list li.orange::before{ content: '⚠'; color: var(--orange); font-size: 10px; top: 8px; }
+.check-list li.red::before   { content: '✗'; color: var(--red); }
+
+/* STRATEGY CARDS */
+.strategy-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.strategy-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.strategy-card.opt1::before { background: var(--blue); }
+.strategy-card.opt2::before { background: var(--green); }
+.strategy-card.opt3::before { background: var(--purple); }
+
+.strategy-card .opt-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 8px;
+}
+.opt1 .opt-label { color: var(--blue); }
+.opt2 .opt-label { color: var(--green); }
+.opt3 .opt-label { color: var(--purple); }
+
+.strategy-card h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 10px;
+}
+
+.strategy-card p {
+  font-size: 13.5px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.pro-con {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+.pro-con-box {
+  background: var(--bg3);
+  border-radius: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+}
+.pro-con-box h4 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
+}
+.pros h4 { color: var(--green); }
+.cons h4 { color: var(--red); }
+.pro-con-box ul {
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.pro-con-box ul li { padding: 2px 0; }
+.pros ul li::before { content: '+ '; color: var(--green); font-weight: 600; }
+.cons ul li::before { content: '- '; color: var(--red); font-weight: 600; }
+
+/* RECOMMENDATION BOX */
+.recommend {
+  background: var(--green-dim);
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-top: 12px;
+  font-size: 13.5px;
+  color: var(--text);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.recommend .rec-icon { color: var(--green); font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+.warn-box {
+  background: var(--orange-dim);
+  border: 1px solid var(--orange);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  color: var(--text);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.warn-box .w-icon { color: var(--orange); font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* MIGRATION STEPS */
+.step-list { margin-bottom: 16px; }
+.step-item {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  position: relative;
+}
+.step-item::after {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 32px;
+  bottom: -12px;
+  width: 1px;
+  background: var(--border);
+}
+.step-item:last-child::after { display: none; }
+.step-num {
+  width: 32px; height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: var(--bg3);
+  border: 2px solid var(--border2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  position: relative;
+  z-index: 1;
+}
+.step-num.active { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
+.step-num.done   { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+.step-content { flex: 1; padding-top: 4px; }
+.step-content h4 { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+.step-content p  { font-size: 13px; color: var(--muted); }
+.step-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* FIND & REPLACE */
+.fr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 12px;
+}
+.fr-table th {
+  text-align: left;
+  padding: 9px 14px;
+  background: var(--bg4);
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  border-bottom: 1px solid var(--border);
+}
+.fr-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.fr-table tr:last-child td { border-bottom: none; }
+.fr-table tr:hover td { background: var(--bg3); }
+.placeholder { color: var(--orange); }
+.replacement { color: var(--green); }
+.fr-table td:nth-child(2) { color: var(--muted); font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; }
+
+/* STRUCTURE TREE */
+.tree-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.tree-box {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.tree-box .tree-header {
+  padding: 10px 16px;
+  background: var(--bg4);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tree-box pre {
+  padding: 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.65;
+}
+
+/* AUTH COMPARISON */
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.auth-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.auth-card.recommended {
+  border-color: var(--green);
+  background: linear-gradient(135deg, rgba(62,207,112,0.05), var(--bg2));
+  position: relative;
+}
+.auth-card.recommended::after {
+  content: 'RECOMMENDED';
+  position: absolute;
+  top: -1px; right: 12px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: var(--green);
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 0 0 6px 6px;
+}
+.auth-card h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.auth-card p {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+/* DB COMPARISON */
+.db-vs {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0;
+  align-items: stretch;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.db-option {
+  padding: 20px 22px;
+  background: var(--bg2);
+}
+.db-option h3 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.db-option p  { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
+.db-vs-divider {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--bg3);
+  color: var(--dim);
+  font-size: 12px;
+  font-weight: 700;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 2px;
+}
+
+/* DIVIDER */
+hr.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 32px 0;
+}
+
+/* Inline mono */
+code {
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--teal);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">◈ Spacio</div>
+    <div class="sub">PHP → Django Integration Plan</div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">Analysis</div>
+    <a class="nav-item active" onclick="scrollTo('analysis')">① Project Analysis</a>
+    <a class="nav-item" onclick="scrollTo('suggestions')">② Suggestions <span class="nav-badge badge-orange">Key</span></a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">Strategy</div>
+    <a class="nav-item" onclick="scrollTo('strategies')">③ Integration Strategies</a>
+    <a class="nav-item" onclick="scrollTo('architecture')">④ Proposed Architecture</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">Structure</div>
+    <a class="nav-item" onclick="scrollTo('structure')">⑤ New Project Structure <span class="nav-badge badge-green">New</span></a>
+    <a class="nav-item" onclick="scrollTo('database')">⑥ Database Design</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">Implementation</div>
+    <a class="nav-item" onclick="scrollTo('auth')">⑦ Authentication Strategy</a>
+    <a class="nav-item" onclick="scrollTo('migration')">⑧ Migration Plan</a>
+    <a class="nav-item" onclick="scrollTo('findreplace')">⑨ Find &amp; Replace <span class="nav-badge badge-purple">Ref</span></a>
+    <a class="nav-item" onclick="scrollTo('setup')">⑩ Setup Instructions</a>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+<div class="content">
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <div class="breadcrumb">SPACIO <span>›</span> Architecture <span>›</span> Integration Plan</div>
+    <h1>PHP + Django<br>Integration Guide</h1>
+    <p class="tagline">A complete architectural plan for integrating Python Django into the existing Spacio PHP system — safely, without breaking anything.</p>
+    <div class="meta-row">
+      <div class="meta-pill"><span class="dot dot-php"></span> PHP 8.x (existing)</div>
+      <div class="meta-pill"><span class="dot dot-django"></span> Django 5.x (new)</div>
+      <div class="meta-pill"><span class="dot dot-blue"></span> REST API bridge</div>
+      <div class="meta-pill"><span class="dot dot-green"></span> Zero downtime plan</div>
+    </div>
+  </div>
+
+  <!-- ① PROJECT ANALYSIS -->
+  <section class="section" id="analysis">
+    <div class="section-header">
+      <div class="section-num">01</div>
+      <h2>Project Analysis</h2>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <p>From the uploaded project structure, Spacio is a <strong>facility/lab reservation management system</strong> with three user roles (Admin, Teacher, Student). It follows a flat PHP MVC-like structure with no formal framework.</p>
+    </div>
+
+    <table class="module-table">
+      <thead>
+        <tr>
+          <th>Module / File</th>
+          <th>Role</th>
+          <th>Location</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>auth.php</td><td>Session-based authentication</td><td>backend/config/</td><td><span class="pill pill-keep">Keep PHP</span></td></tr>
+        <tr><td>database.php</td><td>DB connection (likely PDO/MySQLi)</td><td>backend/config/</td><td><span class="pill pill-shared">Shared</span></td></tr>
+        <tr><td>helpers.php</td><td>Utility / helper functions</td><td>backend/config/</td><td><span class="pill pill-keep">Keep PHP</span></td></tr>
+        <tr><td>check_availability.php</td><td>REST-style availability API</td><td>backend/api/</td><td><span class="pill pill-move">Move Django</span></td></tr>
+        <tr><td>admin/ modules</td><td>Dashboard, inventory, reports, approvals</td><td>frontend/admin/</td><td><span class="pill pill-keep">Keep PHP</span></td></tr>
+        <tr><td>student/ modules</td><td>Reservations, lab view, equipment</td><td>frontend/student/</td><td><span class="pill pill-keep">Keep PHP</span></td></tr>
+        <tr><td>teacher/ modules</td><td>Issue reports, lab usage, status</td><td>frontend/teacher/</td><td><span class="pill pill-keep">Keep PHP</span></td></tr>
+        <tr><td>index.php, login.php</td><td>Entry points and auth forms</td><td>root</td><td><span class="pill pill-keep">Keep PHP</span></td></tr>
+        <tr><td>carousel.js / login.js</td><td>Front-end interactivity</td><td>js/</td><td><span class="pill pill-keep">Keep as-is</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="card-grid">
+      <div class="card blue-accent">
+        <h3>🔐 Authentication</h3>
+        <p>Session-based PHP auth via <code>auth.php</code>. No JWT or token system currently in place. Login/logout handled in root <code>login.php</code> and <code>logout.php</code>.</p>
+      </div>
+      <div class="card orange-accent">
+        <h3>🗄️ Database Layer</h3>
+        <p>Centralized in <code>database.php</code>. Likely uses PDO or MySQLi. No ORM — raw SQL queries throughout. Single database shared by all roles.</p>
+      </div>
+      <div class="card purple-accent">
+        <h3>🗂️ Routing</h3>
+        <p>No framework router. Navigation relies on direct PHP file references. Role-based access enforced manually per file using session checks.</p>
+      </div>
+      <div class="card green-accent">
+        <h3>🧩 API Layer</h3>
+        <p>Minimal — only <code>check_availability.php</code> exists as an API endpoint. No REST architecture, no versioning, no standard response format.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② SUGGESTIONS -->
+  <section class="section" id="suggestions">
+    <div class="section-header">
+      <div class="section-num orange">02</div>
+      <h2>Suggestions</h2>
+      <span class="tag tag-important">Very Important</span>
+    </div>
+
+    <div class="warn-box">
+      <span class="w-icon">⚠</span>
+      <span>These are practical improvements to make before or during Django integration. Skipping these will make the migration harder later.</span>
+    </div>
+
+    <div class="card orange-accent" style="margin-bottom:16px;">
+      <h3>🔧 What to Improve in the Current PHP Project</h3>
+      <ul class="check-list">
+        <li class="orange"><strong>No input sanitization layer</strong> — each PHP file likely handles user input differently. Centralize this in <code>helpers.php</code> before integration.</li>
+        <li class="orange"><strong>No error handling standard</strong> — add a consistent JSON error response format so Django APIs can understand PHP's failures.</li>
+        <li class="orange"><strong>Session security is unclear</strong> — enforce <code>session_regenerate_id()</code> on login and set secure cookie flags in <code>auth.php</code>.</li>
+        <li class="orange"><strong>No API versioning</strong> — add a version prefix now (e.g. <code>/api/v1/</code>) to avoid breaking changes when Django takes over endpoints.</li>
+        <li class="orange"><strong>Direct DB calls everywhere</strong> — consider wrapping all DB calls inside model-like functions in <code>helpers.php</code> for easier migration.</li>
+        <li class="orange"><strong>Missing .env file</strong> — DB credentials and secrets should be in a <code>.env</code> file, not hardcoded in <code>database.php</code>.</li>
+      </ul>
+    </div>
+
+    <div class="card-grid">
+      <div class="card green-accent">
+        <h3>✅ Keep in PHP</h3>
+        <ul class="check-list">
+          <li class="green">All frontend views (admin, student, teacher dashboards)</li>
+          <li class="green">Session-based login/logout pages initially</li>
+          <li class="green">Static assets (CSS, JS, images)</li>
+          <li class="green">PHP includes (header, footer, flash messages)</li>
+          <li class="green"><code>index.php</code> as application entry point</li>
+        </ul>
+      </div>
+      <div class="card blue-accent">
+        <h3>→ Move to Django</h3>
+        <ul class="check-list">
+          <li class="blue"><code>check_availability.php</code> → Django REST API</li>
+          <li class="blue">Reservation logic and conflict detection</li>
+          <li class="blue">Reports and analytics generation</li>
+          <li class="blue">Email/notification services</li>
+          <li class="blue">Authentication (eventually — JWT tokens)</li>
+          <li class="blue">Background tasks (maintenance schedules)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card yellow-accent">
+      <h3>📈 Performance, Scalability & Security Improvements</h3>
+      <ul class="check-list">
+        <li><strong>Add Redis caching</strong> — use Django's cache framework + Redis to cache availability checks and dashboard data</li>
+        <li><strong>Rate limiting on APIs</strong> — Django REST Framework (DRF) supports throttling; PHP has none currently</li>
+        <li><strong>Use PostgreSQL over MySQL</strong> — better Django ORM support, JSON fields, and concurrent reservation handling</li>
+        <li><strong>Add CSRF protection</strong> — PHP has it via forms; Django enforces it automatically via middleware</li>
+        <li><strong>Centralize logging</strong> — Django's logging framework + a tool like Sentry for both PHP and Python errors</li>
+        <li><strong>Containerize with Docker</strong> — run PHP (Nginx/Apache) and Django (Gunicorn) as separate services</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ③ STRATEGIES -->
+  <section class="section" id="strategies">
+    <div class="section-header">
+      <div class="section-num green">03</div>
+      <h2>Integration Strategies</h2>
+    </div>
+
+    <div class="strategy-card opt1">
+      <div class="opt-label">Option 1 · Recommended for Spacio</div>
+      <h3>Django as a REST API Microservice</h3>
+      <p>PHP frontend continues to handle all views and user sessions. A new Django project runs as an independent API server. PHP calls Django via cURL/HTTP for specific operations (availability, reports, reservations). Both systems share the same database.</p>
+      <div class="pro-con">
+        <div class="pro-con-box pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Zero disruption to PHP frontend</li>
+            <li>Django APIs can be built incrementally</li>
+            <li>Clear separation of concerns</li>
+            <li>Easy to test in isolation</li>
+            <li>PHP team keeps working normally</li>
+          </ul>
+        </div>
+        <div class="pro-con-box cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Two servers to run and maintain</li>
+            <li>cURL adds latency vs direct DB calls</li>
+            <li>Auth coordination required</li>
+            <li>Slightly more complex deployment</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="strategy-card opt2">
+      <div class="opt-label">Option 2 · Long-Term Goal</div>
+      <h3>Gradual Migration from PHP to Django</h3>
+      <p>Over several months, PHP pages are progressively replaced by Django views using Django Templates or a React/Vue SPA. The PHP system handles traffic until each module is fully migrated and tested. A reverse proxy (Nginx) routes requests to either PHP or Django based on URL prefixes.</p>
+      <div class="pro-con">
+        <div class="pro-con-box pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>End goal: full Django system</li>
+            <li>Each piece tested before cutover</li>
+            <li>No big-bang rewrite risk</li>
+            <li>Team learns Django gradually</li>
+          </ul>
+        </div>
+        <div class="pro-con-box cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Long transition period (6–18 months)</li>
+            <li>Two codebases to maintain during migration</li>
+            <li>Risk of feature drift between old/new</li>
+            <li>Auth sync is complex mid-migration</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="strategy-card opt3">
+      <div class="opt-label">Option 3 · Simplest Start</div>
+      <h3>Hybrid System — Nginx Reverse Proxy</h3>
+      <p>Nginx acts as a smart gateway. Requests to <code>/api/*</code> are forwarded to Django (port 8000). All other requests go to PHP (Apache/port 80). Both share the database. No cURL needed — Nginx handles the routing transparently.</p>
+      <div class="pro-con">
+        <div class="pro-con-box pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>No PHP code changes needed</li>
+            <li>Clean URL-based separation</li>
+            <li>Nginx handles load balancing</li>
+            <li>Easy to add Django routes over time</li>
+          </ul>
+        </div>
+        <div class="pro-con-box cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Nginx configuration complexity</li>
+            <li>Session/auth sharing still needed</li>
+            <li>Harder to debug routing issues</li>
+            <li>Requires server-level access</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="recommend">
+      <span class="rec-icon">✓</span>
+      <span><strong>Our recommendation for Spacio:</strong> Start with <strong>Option 1</strong> (Django as REST API). It's the safest, most practical path. Once the team is comfortable with Django and the APIs are proven stable, gradually migrate toward Option 2 for full replacement.</span>
+    </div>
+  </section>
+
+  <!-- ④ ARCHITECTURE -->
+  <section class="section" id="architecture">
+    <div class="section-header">
+      <div class="section-num purple">04</div>
+      <h2>Proposed Architecture</h2>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="file-label">System Architecture — Request Flow</span>
+        <span class="lang-badge lang-ascii">ASCII</span>
+      </div>
+      <pre>
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                          BROWSER / CLIENT                           │
+  └───────────────────────────────┬─────────────────────────────────────┘
+                                  │ HTTP Requests
+                                  ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                         NGINX (Reverse Proxy)                       │
+  │   /api/*  ──────────────────────────────────► Django :8000          │
+  │   /*       ─────────────────────────────────► PHP Apache :80        │
+  └─────────────┬──────────────────────────────────────┬────────────────┘
+                │                                      │
+  ┌─────────────▼───────────────┐      ┌───────────────▼──────────────┐
+  │       PHP APPLICATION        │      │      DJANGO REST API          │
+  │  ┌─────────────────────────┐ │      │  ┌──────────────────────────┐│
+  │  │  frontend/              │ │      │  │  api/v1/                 ││
+  │  │  ├── admin/             │ │      │  │  ├── availability/       ││
+  │  │  ├── student/           │ │      │  │  ├── reservations/       ││
+  │  │  └── teacher/           │ │      │  │  ├── reports/            ││
+  │  └─────────────────────────┘ │      │  │  ├── auth/               ││
+  │  ┌─────────────────────────┐ │      │  │  └── users/              ││
+  │  │  backend/config/        │ │      │  └──────────────────────────┘│
+  │  │  ├── auth.php    ◄──────┼─┼──┐   │  ┌──────────────────────────┐│
+  │  │  ├── database.php       │ │  │   │  │  Django ORM Models       ││
+  │  │  └── helpers.php        │ │  └──►│  │  + DRF Serializers       ││
+  │  └─────────────────────────┘ │      │  └──────────────────────────┘│
+  │                               │      │                              │
+  │  [PHP calls Django via cURL]  │      │  [JWT Token Validation]      │
+  └─────────────┬─────────────────┘      └───────────────┬──────────────┘
+                │                                        │
+                └──────────────────┬─────────────────────┘
+                                   │ SQL Queries
+                                   ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │               SHARED DATABASE  (MySQL / PostgreSQL)                 │
+  │   tables: users · reservations · equipment · labs · issues          │
+  └─────────────────────────────────────────────────────────────────────┘
+      </pre>
+    </div>
+
+    <div class="card-grid">
+      <div class="card teal-accent">
+        <h3>📡 PHP → Django Communication</h3>
+        <ul class="check-list">
+          <li>PHP sends HTTP requests to Django using <code>cURL</code></li>
+          <li>Requests include a shared API secret key in the header</li>
+          <li>Django returns standard JSON responses</li>
+          <li>PHP parses the response and renders the view</li>
+        </ul>
+      </div>
+      <div class="card purple-accent">
+        <h3>🔑 Token Flow</h3>
+        <ul class="check-list">
+          <li>User logs in via PHP login form</li>
+          <li>PHP validates credentials against DB</li>
+          <li>On success, PHP calls Django to get a JWT token</li>
+          <li>JWT stored in PHP session — passed on API calls</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="file-label">Proposed API Endpoint Map</span>
+        <span class="lang-badge lang-text">REST</span>
+      </div>
+      <pre>
+  GET    /api/v1/availability/labs/          → Check available labs by date/time
+  GET    /api/v1/availability/equipment/     → Check available equipment
+  POST   /api/v1/reservations/               → Create new reservation
+  GET    /api/v1/reservations/{id}/          → Get reservation details
+  PUT    /api/v1/reservations/{id}/          → Update reservation
+  DELETE /api/v1/reservations/{id}/          → Cancel reservation
+  GET    /api/v1/reservations/my/            → Get current user's reservations
+
+  POST   /api/v1/auth/token/                 → Obtain JWT token (login)
+  POST   /api/v1/auth/token/refresh/         → Refresh JWT token
+  POST   /api/v1/auth/token/verify/          → Verify JWT token
+
+  GET    /api/v1/reports/usage/              → Lab usage analytics
+  GET    /api/v1/reports/issues/             → Issue report summary
+  POST   /api/v1/issues/                     → Submit issue report
+
+  GET    /api/v1/admin/approvals/            → Pending approval list
+  POST   /api/v1/admin/approvals/{id}/       → Approve/reject reservation
+  GET    /api/v1/admin/inventory/            → Equipment inventory
+      </pre>
+    </div>
+  </section>
+
+  <!-- ⑤ STRUCTURE -->
+  <section class="section" id="structure">
+    <div class="section-header">
+      <div class="section-num yellow">05</div>
+      <h2>New Project Structure</h2>
+      <span class="tag tag-new">New</span>
+    </div>
+
+    <div class="tree-container">
+      <div class="tree-box">
+        <div class="tree-header">
+          <span class="pill pill-php">PHP</span> Improved PHP Structure
+        </div>
+        <pre>
+spacio/
+├── backend/
+│   ├── api/
+│   │   ├── check_availability.php  ← (deprecated)
+│   │   └── django_bridge.php       ← NEW: cURL wrapper
+│   └── config/
+│       ├── auth.php
+│       ├── database.php
+│       ├── helpers.php
+│       └── env.php                 ← NEW: .env loader
+├── css/
+│   ├── login.css
+│   └── register.css
+├── frontend/
+│   ├── admin/
+│   │   ├── approvals.php
+│   │   ├── dashboard.php
+│   │   ├── inventory.php
+│   │   ├── maintenance.php
+│   │   └── reports.php
+│   ├── includes/
+│   │   ├── flash.php
+│   │   ├── footer.php
+│   │   └── header.php
+│   ├── student/
+│   │   ├── dashboard.php
+│   │   ├── my_reservations.php
+│   │   ├── reserve_equipment.php
+│   │   ├── reserve_lab.php
+│   │   └── view_computers.php
+│   └── teacher/
+│       ├── dashboard.php
+│       ├── issue_status.php
+│       ├── lab_usage.php
+│       └── report_issue.php
+├── images/  (unchanged)
+├── js/      (unchanged)
+├── .env                             ← NEW: environment variables
+├── index.php
+├── login.php
+├── logout.php
+└── register.php
+        </pre>
+      </div>
+
+      <div class="tree-box">
+        <div class="tree-header">
+          <span class="pill pill-django">Django</span> New Django Structure
+        </div>
+        <pre>
+spacio_api/
+├── spacio_api/              ← Django project
+│   ├── settings/
+│   │   ├── base.py          ← shared settings
+│   │   ├── dev.py           ← development
+│   │   └── prod.py          ← production
+│   ├── urls.py              ← root URL config
+│   ├── wsgi.py
+│   └── asgi.py
+│
+├── apps/
+│   ├── authentication/      ← JWT auth
+│   │   ├── models.py
+│   │   ├── views.py
+│   │   ├── serializers.py
+│   │   └── urls.py
+│   ├── reservations/        ← core booking logic
+│   │   ├── models.py
+│   │   ├── views.py
+│   │   ├── serializers.py
+│   │   └── urls.py
+│   ├── availability/        ← lab/equipment checks
+│   │   ├── views.py
+│   │   └── urls.py
+│   ├── reports/             ← analytics & reports
+│   │   ├── views.py
+│   │   └── urls.py
+│   └── issues/              ← issue reports
+│       ├── models.py
+│       ├── views.py
+│       └── urls.py
+│
+├── requirements.txt
+├── manage.py
+├── .env
+└── Dockerfile
+        </pre>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="file-label">Combined Project — Root Layout</span>
+        <span class="lang-badge lang-ascii">ASCII</span>
+      </div>
+      <pre>
+  /var/www/
+  ├── spacio/                     ← PHP application (served by Apache on :80)
+  │   ├── (all PHP files above)
+  │   └── .env
+  │
+  ├── spacio_api/                 ← Django application (served by Gunicorn on :8000)
+  │   ├── (all Django files above)
+  │   └── .env
+  │
+  └── nginx/
+      └── spacio.conf             ← Nginx routes: /api/* → Django, /* → PHP
+      </pre>
+    </div>
+  </section>
+
+  <!-- ⑥ DATABASE -->
+  <section class="section" id="database">
+    <div class="section-header">
+      <div class="section-num teal">06</div>
+      <h2>Database Design</h2>
+    </div>
+
+    <div class="db-vs">
+      <div class="db-option">
+        <h3>✅ Shared Database <span style="font-size:12px;color:var(--green);font-weight:600;">(Recommended for Spacio)</span></h3>
+        <p>Both PHP and Django connect to the same MySQL/PostgreSQL database. Django uses its ORM to map to existing tables. No data sync needed.</p>
+        <ul class="check-list">
+          <li class="green">No data duplication</li>
+          <li class="green">Reservations visible instantly to both systems</li>
+          <li class="green">Single source of truth</li>
+          <li class="green">Easier for a small team to manage</li>
+          <li class="orange">Django migrations must preserve existing PHP table structure</li>
+          <li class="orange">Use <code>managed = False</code> initially in Django models</li>
+        </ul>
+      </div>
+      <div class="db-vs-divider">VS</div>
+      <div class="db-option">
+        <h3>Separate Databases</h3>
+        <p>PHP keeps its existing database. Django gets a new database for new features only. Data is synced via API calls or a message queue.</p>
+        <ul class="check-list">
+          <li class="green">Complete isolation between systems</li>
+          <li class="green">Can migrate DB schema independently</li>
+          <li class="red">Complex data synchronization required</li>
+          <li class="red">Risk of data inconsistency</li>
+          <li class="red">Much more overhead for a small project</li>
+          <li class="red">Not practical for Spacio at this stage</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card blue-accent">
+      <h3>📋 Suggested Core Tables</h3>
+      <table class="module-table" style="margin-top:12px;margin-bottom:0;">
+        <thead>
+          <tr><th>Table</th><th>Key Fields</th><th>Used By</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>users</td><td>id, name, email, password_hash, role, created_at</td><td><span class="pill pill-php">PHP</span><span class="pill pill-django">Django</span></td></tr>
+          <tr><td>labs</td><td>id, name, capacity, type, status, image</td><td><span class="pill pill-php">PHP</span><span class="pill pill-django">Django</span></td></tr>
+          <tr><td>equipment</td><td>id, name, lab_id, quantity, status</td><td><span class="pill pill-php">PHP</span><span class="pill pill-django">Django</span></td></tr>
+          <tr><td>reservations</td><td>id, user_id, lab_id, start_time, end_time, status, approved_by</td><td><span class="pill pill-django">Django</span></td></tr>
+          <tr><td>issues</td><td>id, reported_by, lab_id, description, status, created_at</td><td><span class="pill pill-django">Django</span></td></tr>
+          <tr><td>maintenance</td><td>id, lab_id, scheduled_at, performed_by, notes</td><td><span class="pill pill-django">Django</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card yellow-accent" style="margin-top:14px;">
+      <h3>⚙️ Django DB Configuration Note</h3>
+      <p>In <code>settings/base.py</code>, point Django to the same database as PHP. Use <code>managed = False</code> in Django models for existing PHP-owned tables (users, labs, equipment) to prevent Django from overwriting them with migrations. Only tables that Django "owns" (reservations, issues) should have <code>managed = True</code>.</p>
+    </div>
+  </section>
+
+  <!-- ⑦ AUTH -->
+  <section class="section" id="auth">
+    <div class="section-header">
+      <div class="section-num red">07</div>
+      <h2>Authentication Strategy</h2>
+    </div>
+
+    <div class="auth-grid">
+      <div class="auth-card">
+        <h3>🐘 Keep Auth in PHP</h3>
+        <p>PHP continues to handle all login/logout and session management. Django APIs verify a shared secret API key — no user-level auth in Django.</p>
+        <ul class="check-list">
+          <li class="green">Simplest to implement</li>
+          <li class="green">No changes to existing auth</li>
+          <li class="red">Can't do per-user auth in Django</li>
+          <li class="red">Not scalable long-term</li>
+        </ul>
+      </div>
+      <div class="auth-card recommended">
+        <h3>🔑 JWT Token Sharing</h3>
+        <p>PHP handles login form and session. On successful login, PHP calls Django to get a JWT. JWT is stored in session and passed on every API call.</p>
+        <ul class="check-list">
+          <li class="green">Best of both worlds</li>
+          <li class="green">Django can verify user identity</li>
+          <li class="green">Stateless — scalable API</li>
+          <li class="green">Minimal PHP changes</li>
+          <li class="orange">Requires token refresh logic</li>
+        </ul>
+      </div>
+      <div class="auth-card">
+        <h3>🌐 Full Auth in Django</h3>
+        <p>All login/logout moved to Django. PHP calls Django auth API to validate every request. PHP sessions replaced with JWT stored in cookies.</p>
+        <ul class="check-list">
+          <li class="green">Clean long-term architecture</li>
+          <li class="green">Django controls all security</li>
+          <li class="red">Large PHP refactor needed</li>
+          <li class="red">High risk of breaking sessions</li>
+          <li class="red">Not for Phase 1</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="recommend">
+      <span class="rec-icon">✓</span>
+      <div>
+        <strong>Recommended: JWT Token Sharing</strong><br>
+        <span style="color:var(--muted);font-size:13px;">
+          Phase 1: Keep PHP sessions + add API key auth on Django endpoints.<br>
+          Phase 2: Introduce JWT — PHP gets a token on login, stores in session, sends on every API call.<br>
+          Phase 3 (optional): Move full auth to Django and replace PHP sessions with JWT cookies.
+        </span>
+      </div>
+    </div>
+
+    <div class="code-block" style="margin-top:16px;">
+      <div class="code-header">
+        <span class="file-label">Phase 1 — API Key Auth Flow</span>
+        <span class="lang-badge lang-ascii">ASCII</span>
+      </div>
+      <pre>
+  PHP Login     →  validate credentials (against DB directly)
+                →  set PHP session: $_SESSION['user_id'], $_SESSION['role']
+                →  all PHP pages use PHP session as before
+
+  PHP API call  →  curl to Django /api/v1/availability/
+                →  adds header:  X-API-Key: YOUR_SHARED_SECRET_KEY
+                →  Django middleware checks X-API-Key header
+                →  if valid → process request → return JSON
+                →  PHP parses JSON → renders in view
+      </pre>
+    </div>
+  </section>
+
+  <!-- ⑧ MIGRATION -->
+  <section class="section" id="migration">
+    <div class="section-header">
+      <div class="section-num blue">08</div>
+      <h2>Step-by-Step Migration Plan</h2>
+    </div>
+
+    <div class="warn-box">
+      <span class="w-icon">⚠</span>
+      <span>Always test each phase fully in a staging environment before deploying to production. Keep PHP system fully functional at all times during migration.</span>
+    </div>
+
+    <div class="step-list">
+      <div class="step-item">
+        <div class="step-num done">1</div>
+        <div class="step-content">
+          <h4>Preparation <span class="step-tag" style="background:var(--green-dim);color:var(--green);">Week 1–2</span></h4>
+          <p>Audit existing PHP code. Add <code>.env</code> file for DB credentials. Create a staging copy of the database. Add API response helper to <code>helpers.php</code>. Set up Git branching strategy (main/staging/feature).</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num done">2</div>
+        <div class="step-content">
+          <h4>Django Project Setup <span class="step-tag" style="background:var(--green-dim);color:var(--green);">Week 2–3</span></h4>
+          <p>Install Python, create virtual environment, install Django + DRF + <code>djangorestframework-simplejwt</code>. Connect Django to the existing database using <code>managed = False</code> models. Verify Django can read existing data without touching it.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num active">3</div>
+        <div class="step-content">
+          <h4>Migrate First API: Availability Check <span class="step-tag" style="background:var(--blue-dim);color:var(--blue);">Week 3–4</span></h4>
+          <p>Replace <code>check_availability.php</code> with a Django endpoint at <code>/api/v1/availability/</code>. Create <code>django_bridge.php</code> in PHP to call Django via cURL. Update PHP frontend pages to use the bridge instead of the old PHP file. Run both in parallel, compare outputs, then switch over.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>Add JWT Authentication <span class="step-tag" style="background:var(--yellow-dim);color:var(--yellow);">Week 5–6</span></h4>
+          <p>Add Django JWT auth endpoint. Modify <code>login.php</code> to call Django login API and store JWT in PHP session alongside existing session. Update <code>django_bridge.php</code> to send JWT in Authorization header. Test all three user roles (admin, student, teacher).</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h4>Migrate Reservation Logic <span class="step-tag" style="background:var(--yellow-dim);color:var(--yellow);">Week 7–9</span></h4>
+          <p>Move reservation creation, approval, and cancellation to Django APIs. Update PHP reservation pages (<code>reserve_lab.php</code>, <code>reserve_equipment.php</code>, <code>my_reservations.php</code>) to call Django APIs. Keep PHP as the view layer — Django handles all data mutations.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <h4>Migrate Reports &amp; Issues <span class="step-tag" style="background:var(--purple-dim);color:var(--purple);">Week 10–12</span></h4>
+          <p>Move <code>reports.php</code> and <code>report_issue.php</code> logic to Django analytics endpoints. Django can use aggregation queries, caching, and background tasks (Celery) for heavy reports. PHP renders the results in existing templates.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-num">7</div>
+        <div class="step-content">
+          <h4>Production Deployment <span class="step-tag" style="background:var(--orange-dim);color:var(--orange);">Week 13+</span></h4>
+          <p>Set up Nginx as reverse proxy. Deploy Django with Gunicorn behind Nginx. Configure SSL for both. Set up process managers (Supervisor or systemd) for both PHP-FPM and Gunicorn. Monitor error logs for 2 weeks. Declare Phase 1 complete.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card teal-accent">
+      <h3>🧪 Testing Strategy During Migration</h3>
+      <ul class="check-list">
+        <li><strong>Run PHP and Django in parallel</strong> — compare outputs from both for the same data before switching</li>
+        <li><strong>Feature flags</strong> — add a config toggle in PHP that switches between old PHP logic and new Django API calls</li>
+        <li><strong>Database snapshots</strong> — take a DB backup before each phase in case rollback is needed</li>
+        <li><strong>Postman/Insomnia</strong> — test every Django endpoint manually before connecting to PHP</li>
+        <li><strong>PHP error logging</strong> — log all cURL responses to a file during testing to catch silent failures</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ⑨ FIND & REPLACE -->
+  <section class="section" id="findreplace">
+    <div class="section-header">
+      <div class="section-num purple">09</div>
+      <h2>Find &amp; Replace Instructions</h2>
+      <span class="tag tag-critical">Reference</span>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <p>Use these placeholders throughout your codebase. Replace each with your actual values before deploying to any environment.</p>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="file-label">API URL Placeholders</span>
+        <span class="lang-badge lang-text">FIND &amp; REPLACE</span>
+      </div>
+      <pre>
+  YOUR_DJANGO_API_URL         →  http://localhost:8000         (local)
+                                 https://api.yourdomain.com    (production)
+
+  YOUR_API_VERSION            →  v1
+
+  YOUR_AVAILABILITY_ENDPOINT  →  /api/v1/availability/labs/
+  YOUR_RESERVATIONS_ENDPOINT  →  /api/v1/reservations/
+  YOUR_AUTH_ENDPOINT          →  /api/v1/auth/token/
+  YOUR_REPORTS_ENDPOINT       →  /api/v1/reports/usage/
+      </pre>
+    </div>
+
+    <table class="fr-table">
+      <thead>
+        <tr>
+          <th>Placeholder</th>
+          <th>Description</th>
+          <th>Example Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="placeholder">YOUR_DB_HOST</td>
+          <td>Database server hostname</td>
+          <td class="replacement">localhost</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_DB_NAME</td>
+          <td>Database name (shared)</td>
+          <td class="replacement">spacio_db</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_DB_USER</td>
+          <td>Database username</td>
+          <td class="replacement">spacio_user</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_DB_PASSWORD</td>
+          <td>Database password</td>
+          <td class="replacement">your_secure_password</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_DB_PORT</td>
+          <td>Database port</td>
+          <td class="replacement">3306 (MySQL) or 5432 (PostgreSQL)</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_DJANGO_SECRET_KEY</td>
+          <td>Django settings SECRET_KEY</td>
+          <td class="replacement">50+ char random string</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_API_SECRET_KEY</td>
+          <td>Shared key between PHP and Django</td>
+          <td class="replacement">spacio_internal_key_2025</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_JWT_SECRET</td>
+          <td>JWT signing key (Django)</td>
+          <td class="replacement">separate 50+ char random string</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_PHP_PROJECT_PATH</td>
+          <td>Absolute path to PHP project root</td>
+          <td class="replacement">/var/www/spacio</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_DJANGO_PROJECT_PATH</td>
+          <td>Absolute path to Django project root</td>
+          <td class="replacement">/var/www/spacio_api</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_DJANGO_PORT</td>
+          <td>Port Django runs on</td>
+          <td class="replacement">8000</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_PHP_PORT</td>
+          <td>Port Apache/PHP runs on</td>
+          <td class="replacement">80 (or 8080 local)</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_ALLOWED_HOSTS</td>
+          <td>Django ALLOWED_HOSTS setting</td>
+          <td class="replacement">localhost, 127.0.0.1, yourdomain.com</td>
+        </tr>
+        <tr>
+          <td class="placeholder">YOUR_CORS_ORIGINS</td>
+          <td>CORS allowed origins (Django)</td>
+          <td class="replacement">http://localhost:80</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="file-label">PHP .env File Template</span>
+        <span class="lang-badge lang-text">ENV</span>
+      </div>
+      <pre>
+  # PHP .env — /var/www/spacio/.env
+  DB_HOST=YOUR_DB_HOST
+  DB_NAME=YOUR_DB_NAME
+  DB_USER=YOUR_DB_USER
+  DB_PASSWORD=YOUR_DB_PASSWORD
+  DB_PORT=YOUR_DB_PORT
+
+  DJANGO_API_URL=YOUR_DJANGO_API_URL
+  API_SECRET_KEY=YOUR_API_SECRET_KEY
+      </pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="file-label">Django .env File Template</span>
+        <span class="lang-badge lang-python">ENV</span>
+      </div>
+      <pre>
+  # Django .env — /var/www/spacio_api/.env
+  SECRET_KEY=YOUR_DJANGO_SECRET_KEY
+  DEBUG=True
+
+  DB_ENGINE=django.db.backends.mysql
+  DB_NAME=YOUR_DB_NAME
+  DB_USER=YOUR_DB_USER
+  DB_PASSWORD=YOUR_DB_PASSWORD
+  DB_HOST=YOUR_DB_HOST
+  DB_PORT=YOUR_DB_PORT
+
+  ALLOWED_HOSTS=YOUR_ALLOWED_HOSTS
+  CORS_ALLOWED_ORIGINS=YOUR_CORS_ORIGINS
+  INTERNAL_API_KEY=YOUR_API_SECRET_KEY
+  JWT_SECRET=YOUR_JWT_SECRET
+      </pre>
+    </div>
+  </section>
+
+  <!-- ⑩ SETUP -->
+  <section class="section" id="setup">
+    <div class="section-header">
+      <div class="section-num green">10</div>
+      <h2>Setup Instructions</h2>
+    </div>
+
+    <div class="card-grid">
+      <div class="card blue-accent">
+        <h3>Prerequisites</h3>
+        <ul class="check-list">
+          <li>PHP 8.x + Apache or Nginx</li>
+          <li>Python 3.11+ installed</li>
+          <li>MySQL 8 or PostgreSQL 15</li>
+          <li>pip (Python package manager)</li>
+          <li>Git for version control</li>
+          <li>Composer (optional, for PHP deps)</li>
+        </ul>
+      </div>
+      <div class="card green-accent">
+        <h3>Required Python Packages</h3>
+        <ul class="check-list">
+          <li><code>django</code> — core framework</li>
+          <li><code>djangorestframework</code> — REST API (DRF)</li>
+          <li><code>djangorestframework-simplejwt</code> — JWT auth</li>
+          <li><code>django-cors-headers</code> — CORS for PHP calls</li>
+          <li><code>mysqlclient</code> or <code>psycopg2</code> — DB driver</li>
+          <li><code>python-dotenv</code> — .env file loading</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="file-label">Django Setup Commands</span>
+        <span class="lang-badge lang-bash">BASH</span>
+      </div>
+      <pre>
+  # 1. Navigate to your projects folder
+  cd /var/www/
+
+  # 2. Create Django project
+  django-admin startproject spacio_api
+  cd spacio_api
+
+  # 3. Create virtual environment
+  python -m venv venv
+  source venv/bin/activate          # Linux/Mac
+  venv\Scripts\activate             # Windows
+
+  # 4. Install dependencies
+  pip install django djangorestframework djangorestframework-simplejwt
+  pip install django-cors-headers python-dotenv mysqlclient
+
+  # 5. Save dependencies
+  pip freeze > requirements.txt
+
+  # 6. Create Django apps
+  python manage.py startapp authentication
+  python manage.py startapp reservations
+  python manage.py startapp availability
+  python manage.py startapp reports
+  python manage.py startapp issues
+
+  # 7. Copy your .env file and fill in YOUR_ placeholders
+  cp .env.example .env
+  nano .env
+
+  # 8. Run migrations (Django-managed tables only)
+  python manage.py migrate
+
+  # 9. Start Django development server
+  python manage.py runserver 0.0.0.0:YOUR_DJANGO_PORT
+      </pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="file-label">Running Both Servers Locally</span>
+        <span class="lang-badge lang-bash">BASH</span>
+      </div>
+      <pre>
+  # Terminal 1 — Start PHP (Apache)
+  # If using XAMPP/WAMP: start via control panel
+  # If using built-in PHP server:
+  cd /var/www/spacio
+  php -S localhost:YOUR_PHP_PORT
+
+  # Terminal 2 — Start Django
+  cd /var/www/spacio_api
+  source venv/bin/activate
+  python manage.py runserver 0.0.0.0:YOUR_DJANGO_PORT
+
+  # Verify both are running:
+  # PHP:    http://localhost:YOUR_PHP_PORT
+  # Django: http://localhost:YOUR_DJANGO_PORT/api/v1/
+  # Admin:  http://localhost:YOUR_DJANGO_PORT/admin/
+      </pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="file-label">Nginx Config — Route PHP + Django</span>
+        <span class="lang-badge lang-text">NGINX</span>
+      </div>
+      <pre>
+  # /etc/nginx/sites-available/spacio.conf
+
+  server {
+      listen 80;
+      server_name YOUR_ALLOWED_HOSTS;
+
+      # Route /api/* to Django (Gunicorn)
+      location /api/ {
+          proxy_pass http://127.0.0.1:YOUR_DJANGO_PORT;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      }
+
+      # Route everything else to PHP
+      location / {
+          root YOUR_PHP_PROJECT_PATH;
+          index index.php;
+
+          location ~ \.php$ {
+              fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+              fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+              include fastcgi_params;
+          }
+      }
+  }
+      </pre>
+    </div>
+
+    <div class="recommend" style="margin-top:16px;">
+      <span class="rec-icon">✓</span>
+      <div>
+        <strong>Local Development Tip:</strong> You don't need Nginx locally. Run PHP on <code>:8080</code> and Django on <code>:8000</code>. In your PHP <code>.env</code>, set <code>DJANGO_API_URL=http://localhost:8000</code>. Everything works without Nginx during development.
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+  <div style="text-align:center;padding:24px 0 48px;color:var(--dim);font-size:13px;">
+    Spacio Integration Guide · Generated for PHP ↔ Django Architecture Planning · All placeholders prefixed with <code style="color:var(--orange);">YOUR_</code>
+  </div>
+
+</div>
+</main>
+
+<script>
+function scrollTo(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+  }
+}
+
+// Active nav on scroll
+const main = document.querySelector('.main');
+const sections = document.querySelectorAll('.section[id]');
+const navItems = document.querySelectorAll('.nav-item');
+
+main.addEventListener('scroll', () => {
+  let current = '';
+  const scrollTop = main.scrollTop + 80;
+  sections.forEach(s => {
+    if (s.offsetTop <= scrollTop) current = s.id;
+  });
+  navItems.forEach(n => {
+    n.classList.remove('active');
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(`'${current}'`)) {
+      n.classList.add('active');
+    }
+  });
+});
+</script>
+</body>
+</html>

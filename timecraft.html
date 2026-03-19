@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TimeCraft — Architecture & Project Structure Guide</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap');
+
+:root {
+  --bg:        #f8f6f1;
+  --bg2:       #f0ede6;
+  --bg3:       #e8e4db;
+  --bg4:       #ddd8ce;
+  --border:    #d4cfc5;
+  --border2:   #c8c2b6;
+  --text:      #1a1814;
+  --muted:     #6b6459;
+  --dim:       #9c9487;
+  --java:      #b07d2e;
+  --java-bg:   #fdf3e0;
+  --java-bdr:  #e8c87a;
+  --react:     #1a6fa8;
+  --react-bg:  #e6f3fc;
+  --react-bdr: #7bbde8;
+  --db:        #2e7a4f;
+  --db-bg:     #e6f5ec;
+  --db-bdr:    #7bcca0;
+  --red:       #c0392b;
+  --red-bg:    #fdecea;
+  --amber:     #b05c00;
+  --amber-bg:  #fff3e0;
+  --purple:    #6b4fa8;
+  --purple-bg: #f0ebfa;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.75;
+  display: flex;
+}
+
+/* ─── SIDEBAR ─── */
+.sidebar {
+  width: 252px;
+  min-width: 252px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-brand {
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-brand .logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  color: var(--text);
+  letter-spacing: -0.3px;
+  line-height: 1;
+}
+.sidebar-brand .logo span { color: var(--java); }
+.sidebar-brand .sub {
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 4px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.nav-section { padding: 12px 0 4px; }
+.nav-label {
+  padding: 4px 18px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--dim);
+}
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.12s;
+}
+.nav-link:hover { color: var(--text); background: var(--bg3); }
+.nav-link.active { color: var(--java); border-left-color: var(--java); background: var(--java-bg); }
+.nav-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-java   { background: var(--java); }
+.dot-react  { background: var(--react); }
+.dot-db     { background: var(--db); }
+.dot-sys    { background: var(--purple); }
+.dot-gray   { background: var(--dim); }
+
+/* ─── MAIN ─── */
+.main { flex: 1; height: 100vh; overflow-y: auto; }
+.content { max-width: 880px; margin: 0 auto; padding: 52px 48px 96px; }
+
+/* ─── PAGE HEADER ─── */
+.page-header {
+  margin-bottom: 52px;
+  padding-bottom: 36px;
+  border-bottom: 1px solid var(--border);
+}
+.page-header .eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--java);
+  margin-bottom: 12px;
+  font-family: 'DM Mono', monospace;
+}
+.page-header h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 42px;
+  font-weight: 400;
+  color: var(--text);
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+  margin-bottom: 14px;
+}
+.page-header .tagline {
+  font-size: 15.5px;
+  color: var(--muted);
+  font-weight: 300;
+  max-width: 580px;
+  line-height: 1.65;
+}
+.tech-strip {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+.tech-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid;
+}
+.tp-java   { background: var(--java-bg);   border-color: var(--java-bdr);  color: var(--java); }
+.tp-react  { background: var(--react-bg);  border-color: var(--react-bdr); color: var(--react); }
+.tp-db     { background: var(--db-bg);     border-color: var(--db-bdr);    color: var(--db); }
+.tp-flyway { background: var(--red-bg);    border-color: #f5b8b2;          color: var(--red); }
+
+/* ─── SECTIONS ─── */
+.section { margin-bottom: 64px; scroll-margin-top: 32px; }
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.section-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dim);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+.section-header h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+.section-tag {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 3px 10px;
+  border-radius: 10px;
+}
+.st-key  { background: var(--amber-bg); color: var(--amber); border: 1px solid #f0c080; }
+.st-new  { background: var(--db-bg);   color: var(--db);    border: 1px solid var(--db-bdr); }
+
+/* ─── CARDS ─── */
+.card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+}
+.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.card-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.card h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.card h4 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--dim); margin-bottom: 8px; }
+.card p  { font-size: 13.5px; color: var(--muted); line-height: 1.65; }
+.card.java-accent   { border-left: 3px solid var(--java);   background: var(--java-bg); }
+.card.react-accent  { border-left: 3px solid var(--react);  background: var(--react-bg); }
+.card.db-accent     { border-left: 3px solid var(--db);     background: var(--db-bg); }
+.card.red-accent    { border-left: 3px solid var(--red);    background: var(--red-bg); }
+.card.purple-accent { border-left: 3px solid var(--purple); background: var(--purple-bg); }
+.card.amber-accent  { border-left: 3px solid var(--amber);  background: var(--amber-bg); }
+
+/* ─── TREE ─── */
+.tree-wrap {
+  background: #1a1814;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: #111009;
+  border-bottom: 1px solid #2e2a24;
+}
+.tree-header .tname { font-family: 'DM Mono', monospace; font-size: 12px; color: #8a8070; }
+.tree-header .tlang {
+  font-size: 10px; padding: 2px 8px; border-radius: 8px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.tl-java  { background: rgba(176,125,46,0.2); color: #d4a055; }
+.tl-react { background: rgba(26,111,168,0.2);  color: #5eb8f0; }
+.tl-db    { background: rgba(46,122,79,0.2);   color: #5ecf8a; }
+.tl-fly   { background: rgba(192,57,43,0.2);   color: #e07060; }
+.tl-all   { background: rgba(107,79,168,0.2);  color: #a88de0; }
+
+.tree-body { padding: 16px 20px; font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.8; }
+.tree-body .tl { display: flex; align-items: baseline; }
+.tree-body .ti { color: #3d3830; user-select: none; }
+.dir  { color: #c8b88a; font-weight: 500; }
+.fjava { color: #e8c87a; }
+.freact{ color: #7bbde8; }
+.fsql  { color: #7bcca0; }
+.fenv  { color: #d4a055; }
+.fconf { color: #b0a898; }
+.fnote { color: #5a5248; font-size: 11px; margin-left: 8px; }
+
+/* ─── TABLE ─── */
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 14px; }
+.data-table th {
+  text-align: left; padding: 10px 14px;
+  background: var(--bg3); color: var(--muted);
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.7px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table th:first-child { border-radius: 8px 0 0 0; }
+.data-table th:last-child  { border-radius: 0 8px 0 0; }
+.data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  color: var(--muted);
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--bg2); }
+.data-table td:first-child { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text); font-weight: 500; }
+
+/* ─── PILLS ─── */
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-right: 3px;
+}
+.p-java   { background: var(--java-bg);   color: var(--java); border: 1px solid var(--java-bdr); }
+.p-react  { background: var(--react-bg);  color: var(--react); border: 1px solid var(--react-bdr); }
+.p-db     { background: var(--db-bg);     color: var(--db);    border: 1px solid var(--db-bdr); }
+.p-req    { background: var(--amber-bg);  color: var(--amber); border: 1px solid #f0c080; }
+.p-opt    { background: var(--bg3);       color: var(--dim);   border: 1px solid var(--border); }
+
+/* ─── CHECKLIST ─── */
+.chk { list-style: none; margin-bottom: 10px; }
+.chk li {
+  padding: 5px 0 5px 22px;
+  position: relative;
+  font-size: 13.5px;
+  color: var(--muted);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.chk li:last-child { border-bottom: none; }
+.chk li::before { content: '›'; position: absolute; left: 4px; color: var(--dim); }
+.chk li strong { color: var(--text); }
+.chk li.java::before { content: '☕'; font-size: 10px; left: 2px; top: 7px; }
+.chk li.react::before{ content: '⚛'; font-size: 10px; left: 2px; top: 7px; }
+.chk li.good::before { content: '✓'; color: var(--db); font-weight: 700; }
+.chk li.warn::before { content: '⚠'; color: var(--amber); font-size: 10px; top: 7px; }
+
+/* ─── MODULE CARDS ─── */
+.module-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.module-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.module-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.mc-auth::before   { background: var(--java); }
+.mc-sched::before  { background: var(--amber); }
+.mc-subject::before{ background: var(--react); }
+.mc-report::before { background: var(--db); }
+.module-card .mc-tag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.mc-auth .mc-tag   { color: var(--java); }
+.mc-sched .mc-tag  { color: var(--amber); }
+.mc-subject .mc-tag{ color: var(--react); }
+.mc-report .mc-tag { color: var(--db); }
+.module-card h3 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.module-card p  { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+
+/* ─── ARCH DIAGRAM ─── */
+.arch-box {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.arch-title {
+  padding: 10px 16px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+}
+.arch-body {
+  padding: 18px 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--muted);
+  background: #fdfcf9;
+}
+.arch-body .hi { color: var(--java); font-weight: 500; }
+.arch-body .hi-r { color: var(--react); font-weight: 500; }
+.arch-body .hi-d { color: var(--db); font-weight: 500; }
+.arch-body .hi-f { color: var(--red); font-weight: 500; }
+
+/* ─── DEP TABLE ─── */
+.dep-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 14px; }
+.dep-table th {
+  text-align: left; padding: 9px 14px;
+  background: var(--bg3); color: var(--muted);
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.7px;
+  border-bottom: 1px solid var(--border);
+}
+.dep-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--muted); font-size: 13px; }
+.dep-table tr:last-child td { border-bottom: none; }
+.dep-table tr:hover td { background: var(--bg2); }
+.dep-table td:first-child { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text); width: 200px; }
+.dep-table td:nth-child(2) { width: 110px; }
+
+/* ─── NOTE BOX ─── */
+.note-box {
+  display: flex;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+  align-items: flex-start;
+}
+.nb-java   { background: var(--java-bg);   border: 1px solid var(--java-bdr);  color: var(--text); }
+.nb-good   { background: var(--db-bg);     border: 1px solid var(--db-bdr);    color: var(--text); }
+.nb-warn   { background: var(--amber-bg);  border: 1px solid #f0c080;          color: var(--text); }
+.nb-info   { background: var(--react-bg);  border: 1px solid var(--react-bdr); color: var(--text); }
+.nb-icon   { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* ─── FLYWAY ─── */
+.migration-flow {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.mf-step {
+  flex: 1;
+  padding: 18px 16px;
+  border-right: 1px solid var(--border);
+  text-align: center;
+}
+.mf-step:last-child { border-right: none; }
+.mf-num {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--red-bg);
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 8px;
+  border: 1px solid #f5b8b2;
+  font-family: 'DM Mono', monospace;
+}
+.mf-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.mf-desc  { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+/* ─── FR TABLE ─── */
+.fr-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'DM Mono', monospace; margin-bottom: 12px; }
+.fr-table th { text-align: left; padding: 9px 14px; background: var(--bg3); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; border-bottom: 1px solid var(--border); font-family: 'DM Sans', sans-serif; }
+.fr-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); color: var(--muted); }
+.fr-table tr:last-child td { border-bottom: none; }
+.fr-table tr:hover td { background: var(--bg2); }
+.ph  { color: var(--amber); }
+.rep { color: var(--db); }
+.fr-table td:nth-child(2) { font-family: 'DM Sans', sans-serif; font-size: 12px; }
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+code {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--java);
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo">Time<span>Craft</span></div>
+    <div class="sub">Architecture Guide</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Overview</div>
+    <a class="nav-link active" onclick="go('structure')"><span class="nav-dot dot-java"></span>Project Structure</a>
+    <a class="nav-link" onclick="go('dependencies')"><span class="nav-dot dot-java"></span>Spring Boot Dependencies</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Data & Architecture</div>
+    <a class="nav-link" onclick="go('migration')"><span class="nav-dot dot-db"></span>Database Migration</a>
+    <a class="nav-link" onclick="go('architecture')"><span class="nav-dot dot-sys"></span>System Architecture</a>
+    <a class="nav-link" onclick="go('database')"><span class="nav-dot dot-db"></span>Database Design</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Backend & Frontend</div>
+    <a class="nav-link" onclick="go('modules')"><span class="nav-dot dot-java"></span>Feature Modules</a>
+    <a class="nav-link" onclick="go('scheduling')"><span class="nav-dot dot-sys"></span>Scheduling Logic</a>
+    <a class="nav-link" onclick="go('frontend')"><span class="nav-dot dot-react"></span>Frontend Structure</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Reference</div>
+    <a class="nav-link" onclick="go('bestpractices')"><span class="nav-dot dot-gray"></span>Best Practices</a>
+    <a class="nav-link" onclick="go('findreplace')"><span class="nav-dot dot-gray"></span>Find &amp; Replace</a>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+<div class="content">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="eyebrow">Architecture Plan · v1.0</div>
+    <h1>TimeCraft<br>Timetabling System</h1>
+    <p class="tagline">Complete architecture and project structure guide for the College Timetabling Management System — Spring Boot · React JSX · PostgreSQL · Flyway.</p>
+    <div class="tech-strip">
+      <span class="tech-pill tp-java">☕ Java Spring Boot</span>
+      <span class="tech-pill tp-react">⚛ React JSX</span>
+      <span class="tech-pill tp-db">🐘 PostgreSQL</span>
+      <span class="tech-pill tp-flyway">✈ Flyway Migrations</span>
+    </div>
+  </div>
+
+  <!-- ① PROJECT STRUCTURE -->
+  <section class="section" id="structure">
+    <div class="section-header">
+      <div class="section-num">01</div>
+      <h2>Project Structure</h2>
+      <span class="section-tag st-key">Very Important</span>
+    </div>
+
+    <div class="note-box nb-info">
+      <span class="nb-icon">ℹ</span>
+      <span>The project is split into three root-level folders: <code>backend/</code> (Spring Boot), <code>frontend/</code> (React JSX), and <code>database/</code> (Flyway migrations). They are separate apps that communicate over REST APIs.</span>
+    </div>
+
+    <div class="tree-wrap">
+      <div class="tree-header">
+        <span class="tname">timecraft/ — full project root</span>
+        <span class="tlang tl-all">combined</span>
+      </div>
+      <div class="tree-body">
+        <div class="tl"><span class="dir">timecraft/</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="dir">backend/</span><span class="fnote">Spring Boot application</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="dir">frontend/</span><span class="fnote">React JSX application</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="dir">database/</span><span class="fnote">Flyway migration scripts</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="dir">docs/</span><span class="fnote">API docs, diagrams, notes</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="fenv">.env.example</span><span class="fnote">environment variable template</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="fconf">docker-compose.yml</span><span class="fnote">run all services together</span></div>
+        <div class="tl"><span class="ti">└── </span><span class="fconf">README.md</span></div>
+      </div>
+    </div>
+
+    <div class="tree-wrap">
+      <div class="tree-header">
+        <span class="tname">backend/ — Spring Boot</span>
+        <span class="tlang tl-java">Java</span>
+      </div>
+      <div class="tree-body">
+        <div class="tl"><span class="dir">backend/</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="dir">src/main/java/com/timecraft/</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">controller/</span><span class="fnote">REST endpoints — handles HTTP requests</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">AuthController.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">ScheduleController.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">SubjectController.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">RoomController.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">TeacherController.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">DepartmentController.java</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="fjava">ReportController.java</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">service/</span><span class="fnote">business logic layer</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">AuthService.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">ScheduleService.java</span><span class="fnote">← timetable generation engine</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">ConflictDetectionService.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">SubjectService.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">RoomService.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">TeacherService.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">DepartmentService.java</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="fjava">ReportService.java</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">repository/</span><span class="fnote">Spring Data JPA interfaces — DB queries</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">UserRepository.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">ScheduleRepository.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">SubjectRepository.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">RoomRepository.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">TeacherRepository.java</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="fjava">DepartmentRepository.java</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">model/</span><span class="fnote">JPA entity classes — map to DB tables</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">User.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">Schedule.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">Subject.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">Room.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">Teacher.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">Department.java</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="fjava">TeacherAvailability.java</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">dto/</span><span class="fnote">Data Transfer Objects — API request/response shapes</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="dir">request/</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="fjava">LoginRequest.java</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="fjava">RegisterRequest.java</span></div>
+        <div class="tl"><span class="ti">│   │   │   └── </span><span class="fjava">ScheduleGenerateRequest.java</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="dir">response/</span></div>
+        <div class="tl"><span class="ti">│   │       ├── </span><span class="fjava">AuthResponse.java</span></div>
+        <div class="tl"><span class="ti">│   │       ├── </span><span class="fjava">ScheduleResponse.java</span></div>
+        <div class="tl"><span class="ti">│   │       └── </span><span class="fjava">ApiResponse.java</span><span class="fnote">generic wrapper</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">config/</span><span class="fnote">Spring configuration classes</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">SecurityConfig.java</span><span class="fnote">JWT + role-based access</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">CorsConfig.java</span><span class="fnote">allow React frontend calls</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="fjava">FlywayConfig.java</span><span class="fnote">migration config (optional override)</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">exception/</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">GlobalExceptionHandler.java</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="fjava">ScheduleConflictException.java</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">security/</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">JwtUtil.java</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="fjava">JwtAuthFilter.java</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="fjava">UserDetailsServiceImpl.java</span></div>
+        <div class="tl"><span class="ti">│   └── </span><span class="fjava">TimeCraftApplication.java</span><span class="fnote">main entry point</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="dir">src/main/resources/</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="fconf">application.yml</span><span class="fnote">DB, server, JWT config</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="fconf">application-dev.yml</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="fconf">application-prod.yml</span></div>
+        <div class="tl"><span class="ti">│   └── </span><span class="dir">db/migration/</span><span class="fnote">← Flyway SQL scripts live here</span></div>
+        <div class="tl"><span class="ti">│       ├── </span><span class="fsql">V1__create_users_table.sql</span></div>
+        <div class="tl"><span class="ti">│       ├── </span><span class="fsql">V2__create_departments_table.sql</span></div>
+        <div class="tl"><span class="ti">│       ├── </span><span class="fsql">V3__create_rooms_table.sql</span></div>
+        <div class="tl"><span class="ti">│       ├── </span><span class="fsql">V4__create_subjects_table.sql</span></div>
+        <div class="tl"><span class="ti">│       ├── </span><span class="fsql">V5__create_teachers_table.sql</span></div>
+        <div class="tl"><span class="ti">│       ├── </span><span class="fsql">V6__create_teacher_availability.sql</span></div>
+        <div class="tl"><span class="ti">│       └── </span><span class="fsql">V7__create_schedules_table.sql</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="dir">src/test/</span></div>
+        <div class="tl"><span class="ti">└── </span><span class="fconf">pom.xml</span><span class="fnote">Maven dependencies</span></div>
+      </div>
+    </div>
+
+    <div class="tree-wrap">
+      <div class="tree-header">
+        <span class="tname">frontend/ — React JSX</span>
+        <span class="tlang tl-react">React</span>
+      </div>
+      <div class="tree-body">
+        <div class="tl"><span class="dir">frontend/</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="dir">public/</span><span class="fnote">index.html, favicon, static assets</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="dir">src/</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">pages/</span><span class="fnote">one folder per user role</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="dir">auth/</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">LoginPage.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   └── </span><span class="freact">RegisterPage.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="dir">admin/</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">AdminDashboard.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">ManageRooms.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">ManageDepartments.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">GenerateSchedule.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   └── </span><span class="freact">Reports.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="dir">teacher/</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">TeacherDashboard.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">SetAvailability.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   └── </span><span class="freact">ViewMySchedule.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="dir">student/</span></div>
+        <div class="tl"><span class="ti">│   │       ├── </span><span class="freact">StudentDashboard.jsx</span></div>
+        <div class="tl"><span class="ti">│   │       └── </span><span class="freact">ViewTimetable.jsx</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">components/</span><span class="fnote">shared UI components</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="dir">layout/</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">Navbar.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">Sidebar.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   └── </span><span class="freact">ProtectedRoute.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="dir">schedule/</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">TimetableGrid.jsx</span><span class="fnote">← main timetable view</span></div>
+        <div class="tl"><span class="ti">│   │   │   ├── </span><span class="freact">ConflictAlert.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   │   └── </span><span class="freact">ScheduleSlot.jsx</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="dir">ui/</span></div>
+        <div class="tl"><span class="ti">│   │       ├── </span><span class="freact">Button.jsx</span></div>
+        <div class="tl"><span class="ti">│   │       ├── </span><span class="freact">Modal.jsx</span></div>
+        <div class="tl"><span class="ti">│   │       └── </span><span class="freact">Table.jsx</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">services/</span><span class="fnote">Axios API call functions</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="freact">api.js</span><span class="fnote">Axios base instance + interceptors</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="freact">authService.js</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="freact">scheduleService.js</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="freact">subjectService.js</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="freact">roomService.js</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="freact">reportService.js</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">hooks/</span><span class="fnote">custom React hooks</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="freact">useAuth.js</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="freact">useSchedule.js</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="freact">useConflict.js</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">context/</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="freact">AuthContext.jsx</span><span class="fnote">global auth state</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">router/</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="freact">AppRouter.jsx</span><span class="fnote">React Router — role-based routes</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="dir">utils/</span></div>
+        <div class="tl"><span class="ti">│   │   ├── </span><span class="freact">formatters.js</span></div>
+        <div class="tl"><span class="ti">│   │   └── </span><span class="freact">constants.js</span></div>
+        <div class="tl"><span class="ti">│   ├── </span><span class="freact">App.jsx</span></div>
+        <div class="tl"><span class="ti">│   └── </span><span class="freact">main.jsx</span><span class="fnote">Vite/CRA entry point</span></div>
+        <div class="tl"><span class="ti">├── </span><span class="fenv">.env</span><span class="fnote">VITE_API_BASE_URL=http://localhost:8080/api</span></div>
+        <div class="tl"><span class="ti">└── </span><span class="fconf">package.json</span></div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ② DEPENDENCIES -->
+  <section class="section" id="dependencies">
+    <div class="section-header">
+      <div class="section-num">02</div>
+      <h2>Spring Boot Dependencies</h2>
+      <span class="section-tag st-key">Very Important</span>
+    </div>
+
+    <div class="note-box nb-java">
+      <span class="nb-icon">☕</span>
+      <span>Add these via <strong>Spring Initializr</strong> (start.spring.io). Select: Project = Maven, Language = Java, Spring Boot = 3.x, Packaging = Jar, Java = 17+.</span>
+    </div>
+
+    <table class="dep-table">
+      <thead>
+        <tr>
+          <th>Dependency</th>
+          <th>Type</th>
+          <th>Why it's needed</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>spring-boot-starter-web</td>
+          <td><span class="pill p-req">Required</span></td>
+          <td>Builds REST controllers — handles all HTTP requests/responses from the React frontend</td>
+        </tr>
+        <tr>
+          <td>spring-boot-starter-data-jpa</td>
+          <td><span class="pill p-req">Required</span></td>
+          <td>Spring Data JPA + Hibernate ORM — maps Java model classes to PostgreSQL tables automatically</td>
+        </tr>
+        <tr>
+          <td>postgresql</td>
+          <td><span class="pill p-req">Required</span></td>
+          <td>JDBC driver that lets Spring Boot connect to your PostgreSQL database</td>
+        </tr>
+        <tr>
+          <td>spring-boot-starter-security</td>
+          <td><span class="pill p-req">Required</span></td>
+          <td>Secures all API endpoints — used together with JWT for role-based access (ADMIN, TEACHER, STUDENT)</td>
+        </tr>
+        <tr>
+          <td>spring-boot-starter-validation</td>
+          <td><span class="pill p-req">Required</span></td>
+          <td>Validates incoming request bodies using annotations like <code>@NotBlank</code>, <code>@Email</code>, <code>@Size</code></td>
+        </tr>
+        <tr>
+          <td>flyway-core</td>
+          <td><span class="pill p-req">Required</span></td>
+          <td>Manages database schema versions — auto-runs SQL migration scripts on startup in order</td>
+        </tr>
+        <tr>
+          <td>lombok</td>
+          <td><span class="pill p-req">Required</span></td>
+          <td>Generates boilerplate code — replaces manual getters/setters/constructors with <code>@Data</code>, <code>@Builder</code>, etc.</td>
+        </tr>
+        <tr>
+          <td>jjwt-api / jjwt-impl / jjwt-jackson</td>
+          <td><span class="pill p-req">Required</span></td>
+          <td>JSON Web Token library — generates and validates JWT tokens for stateless authentication</td>
+        </tr>
+        <tr>
+          <td>spring-boot-starter-test</td>
+          <td><span class="pill p-req">Required</span></td>
+          <td>JUnit 5 + Mockito for unit and integration testing of services and controllers</td>
+        </tr>
+        <tr>
+          <td>spring-boot-devtools</td>
+          <td><span class="pill p-opt">Optional</span></td>
+          <td>Hot reload during development — automatically restarts Spring Boot when you save changes</td>
+        </tr>
+        <tr>
+          <td>springdoc-openapi-starter-webmvc-ui</td>
+          <td><span class="pill p-opt">Optional</span></td>
+          <td>Auto-generates Swagger UI at <code>/swagger-ui.html</code> — browse and test all REST APIs visually</td>
+        </tr>
+        <tr>
+          <td>mapstruct</td>
+          <td><span class="pill p-opt">Optional</span></td>
+          <td>Auto-maps between Entity objects and DTOs — reduces repetitive conversion code</td>
+        </tr>
+      </tbody>
+    </table>
+
+  </section>
+
+  <!-- ③ DATABASE MIGRATION -->
+  <section class="section" id="migration">
+    <div class="section-header">
+      <div class="section-num">03</div>
+      <h2>Database Migration with Flyway</h2>
+      <span class="section-tag st-key">Very Important</span>
+    </div>
+
+    <div class="note-box nb-good">
+      <span class="nb-icon">✓</span>
+      <span><strong>Flyway is recommended</strong> over Liquibase for this project. It uses plain SQL files (no XML/YAML), is simpler to set up with Spring Boot, and is easier for beginners to understand and debug.</span>
+    </div>
+
+    <div class="card">
+      <h3>Why database migration is important</h3>
+      <ul class="chk">
+        <li class="good"><strong>Version control for your database</strong> — every schema change is tracked like a Git commit</li>
+        <li class="good"><strong>Team collaboration</strong> — everyone on the team gets the same DB structure automatically</li>
+        <li class="good"><strong>Safe deployments</strong> — migrations run automatically when the app starts, no manual SQL scripts</li>
+        <li class="good"><strong>Rollback tracking</strong> — you know exactly what changed and when, making debugging easier</li>
+        <li class="good"><strong>Production safety</strong> — no more "forgot to run the SQL on the server" issues</li>
+      </ul>
+    </div>
+
+    <div class="migration-flow">
+      <div class="mf-step">
+        <div class="mf-num">1</div>
+        <div class="mf-title">App starts up</div>
+        <div class="mf-desc">Spring Boot launches and Flyway activates automatically</div>
+      </div>
+      <div class="mf-step">
+        <div class="mf-num">2</div>
+        <div class="mf-title">Flyway checks DB</div>
+        <div class="mf-desc">Reads the <code>flyway_schema_history</code> table to see what's already been run</div>
+      </div>
+      <div class="mf-step">
+        <div class="mf-num">3</div>
+        <div class="mf-title">Runs new scripts</div>
+        <div class="mf-desc">Executes any <code>V*.sql</code> files not yet applied, in version order</div>
+      </div>
+      <div class="mf-step">
+        <div class="mf-num">4</div>
+        <div class="mf-title">App is ready</div>
+        <div class="mf-desc">DB schema is now up to date. App continues loading normally</div>
+      </div>
+    </div>
+
+    <div class="card db-accent">
+      <h3>Migration file naming convention</h3>
+      <p style="margin-bottom:12px;">Files go in: <code>src/main/resources/db/migration/</code></p>
+      <table class="data-table" style="margin-bottom:0;">
+        <thead><tr><th>File name</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>V1__create_users_table.sql</td><td>Creates the <code>users</code> table with roles, email, password hash</td></tr>
+          <tr><td>V2__create_departments_table.sql</td><td>Creates the <code>departments</code> table</td></tr>
+          <tr><td>V3__create_rooms_table.sql</td><td>Creates the <code>rooms</code> table with capacity and type</td></tr>
+          <tr><td>V4__create_subjects_table.sql</td><td>Creates the <code>subjects</code> table with units and department FK</td></tr>
+          <tr><td>V5__create_teachers_table.sql</td><td>Creates the <code>teachers</code> table linking to users</td></tr>
+          <tr><td>V6__create_teacher_availability.sql</td><td>Stores teacher day/time preferences</td></tr>
+          <tr><td>V7__create_schedules_table.sql</td><td>Creates the main <code>schedules</code> table with all FKs</td></tr>
+          <tr><td>V8__seed_initial_data.sql</td><td>Inserts default admin user and sample departments</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note-box nb-warn">
+      <span class="nb-icon">⚠</span>
+      <span><strong>Never edit an existing migration file</strong> after it has been run. Flyway checksums each file — if you change a file that's already been applied, the app will refuse to start. Always create a new <code>V9__...</code> file for changes.</span>
+    </div>
+
+  </section>
+
+  <!-- ④ ARCHITECTURE -->
+  <section class="section" id="architecture">
+    <div class="section-header">
+      <div class="section-num">04</div>
+      <h2>System Architecture</h2>
+    </div>
+
+    <div class="arch-box">
+      <div class="arch-title">High-Level Architecture — Request Flow</div>
+      <div class="arch-body">
+<pre>
+  ┌──────────────────────────────────────────────────────────────┐
+  │                  REACT JSX FRONTEND  (:3000)                 │
+  │                                                              │
+  │  pages/admin/    pages/teacher/    pages/student/            │
+  │  GenerateSchedule  SetAvailability   ViewTimetable           │
+  │       │                  │                │                  │
+  │       └──────────────────┴────────────────┘                  │
+  │                          │                                   │
+  │              services/scheduleService.js                     │
+  │              Axios — sends JWT in Authorization header       │
+  └──────────────────────────┬───────────────────────────────────┘
+                             │  REST API calls (JSON over HTTP)
+                             │  GET /api/schedules
+                             │  POST /api/schedules/generate
+                             │  POST /api/auth/login
+                             ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │               SPRING BOOT BACKEND  (:8080)                   │
+  │                                                              │
+  │  ┌─────────────────────────────────────────────────────┐    │
+  │  │  Security Layer — JwtAuthFilter                      │    │
+  │  │  validates JWT token on every protected request      │    │
+  │  └──────────────────────────┬──────────────────────────┘    │
+  │                             │                               │
+  │  ┌──────────────────────────▼──────────────────────────┐    │
+  │  │  Controllers  (REST endpoints)                       │    │
+  │  │  ScheduleController · AuthController · RoomController│   │
+  │  └──────────────────────────┬──────────────────────────┘    │
+  │                             │                               │
+  │  ┌──────────────────────────▼──────────────────────────┐    │
+  │  │  Services  (business logic)                          │    │
+  │  │  ScheduleService · ConflictDetectionService          │    │
+  │  └──────────────────────────┬──────────────────────────┘    │
+  │                             │                               │
+  │  ┌──────────────────────────▼──────────────────────────┐    │
+  │  │  Repositories  (Spring Data JPA)                     │    │
+  │  │  ScheduleRepository · RoomRepository …               │    │
+  │  └──────────────────────────┬──────────────────────────┘    │
+  └──────────────────────────────┼───────────────────────────────┘
+                                 │  JDBC / Hibernate ORM
+                                 ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │              POSTGRESQL DATABASE  (:5432)                    │
+  │  users · departments · rooms · subjects ·                    │
+  │  teachers · teacher_availability · schedules                 │
+  │                                                              │
+  │  Schema managed by Flyway migrations                         │
+  └──────────────────────────────────────────────────────────────┘
+</pre>
+      </div>
+    </div>
+
+    <div class="card-grid">
+      <div class="card react-accent">
+        <h3>React → Spring Boot</h3>
+        <ul class="chk">
+          <li>All calls go through <code>services/api.js</code> (Axios instance)</li>
+          <li>JWT token attached to every request header automatically</li>
+          <li>Base URL stored in <code>.env</code> as <code>VITE_API_BASE_URL</code></li>
+          <li>Axios interceptors handle token expiry and redirect to login</li>
+        </ul>
+      </div>
+      <div class="card java-accent">
+        <h3>Spring Boot → PostgreSQL</h3>
+        <ul class="chk">
+          <li>Repositories extend <code>JpaRepository</code> — no SQL needed for basic CRUD</li>
+          <li>Custom queries use <code>@Query</code> with JPQL for complex joins</li>
+          <li>Flyway handles schema at startup — DB is always in sync</li>
+          <li>Connection pooling via HikariCP (built into Spring Boot)</li>
+        </ul>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ⑤ DATABASE DESIGN -->
+  <section class="section" id="database">
+    <div class="section-header">
+      <div class="section-num">05</div>
+      <h2>Database Design</h2>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr><th>Table</th><th>Key Fields</th><th>Relationships</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>users</td>
+          <td>id, email, password_hash, role (ADMIN/TEACHER/STUDENT), is_active, created_at</td>
+          <td>One user → one teacher profile OR one student profile</td>
+        </tr>
+        <tr>
+          <td>departments</td>
+          <td>id, name, code, head_teacher_id</td>
+          <td>One department → many subjects, many teachers, many students</td>
+        </tr>
+        <tr>
+          <td>rooms</td>
+          <td>id, room_code, name, capacity, type (LAB/LECTURE/SEMINAR), building</td>
+          <td>One room → many schedule slots (but not at the same time — conflict check)</td>
+        </tr>
+        <tr>
+          <td>subjects</td>
+          <td>id, code, name, units, hours_per_week, department_id, year_level</td>
+          <td>Belongs to one department · assigned to teachers via schedules</td>
+        </tr>
+        <tr>
+          <td>teachers</td>
+          <td>id, user_id (FK), employee_id, department_id, max_hours_per_week</td>
+          <td>One teacher → many availability slots · many schedule assignments</td>
+        </tr>
+        <tr>
+          <td>teacher_availability</td>
+          <td>id, teacher_id, day_of_week, start_time, end_time, is_preferred</td>
+          <td>Many availability rows per teacher — used as input to scheduling engine</td>
+        </tr>
+        <tr>
+          <td>schedules</td>
+          <td>id, subject_id, teacher_id, room_id, section, day_of_week, start_time, end_time, semester, academic_year, status</td>
+          <td>Central table — references subjects, teachers, rooms. Conflict detection runs against this table.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="card purple-accent">
+      <h3>Key Relationships at a Glance</h3>
+      <ul class="chk">
+        <li><strong>Department → Subjects</strong>: One department has many subjects (1:N)</li>
+        <li><strong>Department → Teachers</strong>: One department has many teachers (1:N)</li>
+        <li><strong>Teacher → Availability</strong>: One teacher has many time slots (1:N)</li>
+        <li><strong>Schedule</strong>: Joins teacher + subject + room + time slot — the core conflict table (N:1 to each)</li>
+        <li><strong>Conflict rule</strong>: No teacher, room, or subject section can appear twice at the same day+time</li>
+      </ul>
+    </div>
+
+  </section>
+
+  <!-- ⑥ MODULES -->
+  <section class="section" id="modules">
+    <div class="section-header">
+      <div class="section-num">06</div>
+      <h2>Feature-Based Module Design</h2>
+    </div>
+
+    <div class="module-grid">
+      <div class="module-card mc-auth">
+        <div class="mc-tag">Module 1</div>
+        <h3>Authentication & Users</h3>
+        <p>Handles login, registration, JWT issuance, role-based access. Three roles: ADMIN, TEACHER, STUDENT. Spring Security + JWT.</p>
+        <ul class="chk">
+          <li><span class="pill p-java">Controller</span> AuthController</li>
+          <li><span class="pill p-java">Service</span> AuthService, UserDetailsServiceImpl</li>
+          <li><span class="pill p-java">Security</span> JwtUtil, JwtAuthFilter</li>
+          <li><span class="pill p-java">Endpoints</span> POST /auth/login, /auth/register</li>
+        </ul>
+      </div>
+
+      <div class="module-card mc-sched">
+        <div class="mc-tag">Module 2</div>
+        <h3>Scheduling Engine</h3>
+        <p>The core of TimeCraft. Accepts constraints (rooms, teacher availability, subjects) and generates a conflict-free timetable.</p>
+        <ul class="chk">
+          <li><span class="pill p-java">Service</span> ScheduleService, ConflictDetectionService</li>
+          <li><span class="pill p-java">Logic</span> Greedy assignment + backtracking</li>
+          <li><span class="pill p-java">Endpoints</span> POST /schedules/generate, GET /schedules</li>
+        </ul>
+      </div>
+
+      <div class="module-card mc-subject">
+        <div class="mc-tag">Module 3</div>
+        <h3>Subject & Teacher Management</h3>
+        <p>Admin manages subjects and departments. Teachers set their availability and subject preferences.</p>
+        <ul class="chk">
+          <li><span class="pill p-java">Controllers</span> SubjectController, TeacherController</li>
+          <li><span class="pill p-java">Endpoints</span> CRUD for /subjects, /teachers, /departments</li>
+          <li><span class="pill p-java">Feature</span> Teacher availability calendar input</li>
+        </ul>
+      </div>
+
+      <div class="module-card mc-report">
+        <div class="mc-tag">Module 4</div>
+        <h3>Reporting</h3>
+        <p>Generates teaching load reports, room usage summaries, and department schedule overviews. Exportable as PDF/CSV.</p>
+        <ul class="chk">
+          <li><span class="pill p-java">Controller</span> ReportController</li>
+          <li><span class="pill p-java">Service</span> ReportService</li>
+          <li><span class="pill p-java">Endpoints</span> GET /reports/teaching-load, /reports/room-usage</li>
+        </ul>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ⑦ SCHEDULING LOGIC -->
+  <section class="section" id="scheduling">
+    <div class="section-header">
+      <div class="section-num">07</div>
+      <h2>Scheduling Logic</h2>
+    </div>
+
+    <div class="card amber-accent">
+      <h3>How timetable generation works (conceptual)</h3>
+      <p>The scheduling engine lives in <code>ScheduleService.java</code> and is called when Admin triggers "Generate Schedule." It works in three phases:</p>
+    </div>
+
+    <div class="card-grid-3">
+      <div class="card">
+        <h4>Phase 1 — Collect inputs</h4>
+        <ul class="chk">
+          <li>All subjects for the semester</li>
+          <li>Teacher availability slots</li>
+          <li>Room list with capacity + type</li>
+          <li>Existing schedule constraints (holidays, fixed slots)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Phase 2 — Assign slots</h4>
+        <ul class="chk">
+          <li>For each subject, find an available teacher</li>
+          <li>Check teacher is free at the time slot</li>
+          <li>Find a room that is free + has enough capacity</li>
+          <li>If conflict found → try next slot (backtrack)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Phase 3 — Conflict check</h4>
+        <ul class="chk">
+          <li>Teacher double-booked at same time?</li>
+          <li>Room double-booked at same time?</li>
+          <li>Section assigned two subjects at same time?</li>
+          <li>Teacher hours exceed max_hours_per_week?</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="arch-box">
+      <div class="arch-title">Scheduling Algorithm Flow</div>
+      <div class="arch-body">
+<pre>
+  Input: subjects[], teachers[], rooms[], availabilities[]
+
+  FOR each subject in subjects:
+    FOR each available time_slot:
+      teacher = findAvailableTeacher(subject, time_slot)
+      room    = findAvailableRoom(subject.capacity, time_slot)
+
+      IF teacher != null AND room != null:
+        IF !hasConflict(teacher, room, section, time_slot):
+          assign(subject, teacher, room, time_slot)  ← success
+          BREAK
+        ELSE:
+          log conflict, try next slot  ← backtrack
+
+  IF subject still unassigned after all slots tried:
+    → throw ScheduleConflictException (notify admin)
+
+  Output: List of Schedule entries saved to DB
+</pre>
+      </div>
+    </div>
+
+    <div class="note-box nb-info">
+      <span class="nb-icon">ℹ</span>
+      <span><strong>Algorithm recommendation:</strong> Start with a <strong>Greedy algorithm</strong> (assign first available slot). If too many conflicts arise in testing, upgrade to a <strong>Constraint Satisfaction Problem (CSP)</strong> solver or use a library like OptaPlanner (by Red Hat, works with Spring Boot natively).</span>
+    </div>
+
+  </section>
+
+  <!-- ⑧ FRONTEND -->
+  <section class="section" id="frontend">
+    <div class="section-header">
+      <div class="section-num">08</div>
+      <h2>Frontend Structure (React JSX)</h2>
+    </div>
+
+    <div class="card-grid">
+      <div class="card react-accent">
+        <h3>Routing Strategy</h3>
+        <p>Use React Router v6 with role-based protected routes. The <code>ProtectedRoute.jsx</code> component checks the user's role from <code>AuthContext</code> and redirects if unauthorized.</p>
+        <ul class="chk" style="margin-top:10px;">
+          <li><code>/login</code> — public</li>
+          <li><code>/admin/*</code> — ADMIN role only</li>
+          <li><code>/teacher/*</code> — TEACHER role only</li>
+          <li><code>/student/*</code> — STUDENT role only</li>
+        </ul>
+      </div>
+      <div class="card react-accent">
+        <h3>API Services Pattern</h3>
+        <p>All API calls are in <code>services/</code>. Components never call Axios directly — they call service functions. This makes it easy to swap the API URL or add mock data during testing.</p>
+        <ul class="chk" style="margin-top:10px;">
+          <li><code>api.js</code> — base Axios instance</li>
+          <li>JWT automatically attached via interceptor</li>
+          <li>401 responses auto-logout via interceptor</li>
+        </ul>
+      </div>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr><th>File / Component</th><th>Role</th><th>Key feature</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>TimetableGrid.jsx</td><td>Shared</td><td>Renders schedule as a weekly grid — columns = days, rows = time slots</td></tr>
+        <tr><td>ConflictAlert.jsx</td><td>Admin</td><td>Shows conflict list returned by the scheduling engine with details</td></tr>
+        <tr><td>SetAvailability.jsx</td><td>Teacher</td><td>Calendar/checkbox UI for teachers to mark available time slots</td></tr>
+        <tr><td>GenerateSchedule.jsx</td><td>Admin</td><td>Triggers POST /api/schedules/generate and shows progress/result</td></tr>
+        <tr><td>AuthContext.jsx</td><td>Global</td><td>Stores JWT, user role, login/logout functions — available everywhere</td></tr>
+        <tr><td>AppRouter.jsx</td><td>Global</td><td>All routes defined here — wraps role-specific routes in ProtectedRoute</td></tr>
+      </tbody>
+    </table>
+
+  </section>
+
+  <!-- ⑨ BEST PRACTICES -->
+  <section class="section" id="bestpractices">
+    <div class="section-header">
+      <div class="section-num">09</div>
+      <h2>Suggestions &amp; Best Practices</h2>
+    </div>
+
+    <div class="card-grid">
+      <div class="card java-accent">
+        <h3>🔒 Security</h3>
+        <ul class="chk">
+          <li class="good"><strong>Never store plain passwords</strong> — Spring Security's BCryptPasswordEncoder handles hashing</li>
+          <li class="good"><strong>Use short JWT expiry</strong> — 15 min access token + 7 day refresh token</li>
+          <li class="good"><strong>Role-based method security</strong> — use <code>@PreAuthorize("hasRole('ADMIN')")</code> on service methods</li>
+          <li class="warn"><strong>Never put DB credentials in code</strong> — use <code>application.yml</code> with env variable references</li>
+          <li class="good"><strong>CORS config</strong> — explicitly whitelist only <code>http://localhost:3000</code> in dev, your domain in prod</li>
+        </ul>
+      </div>
+      <div class="card react-accent">
+        <h3>📐 Clean Architecture</h3>
+        <ul class="chk">
+          <li class="good"><strong>Controller → Service → Repository</strong> — never skip layers, never call repository from controller</li>
+          <li class="good"><strong>Always use DTOs</strong> — never expose entity objects directly in API responses</li>
+          <li class="good"><strong>One service per domain</strong> — ScheduleService only does scheduling, not user management</li>
+          <li class="good"><strong>Global exception handler</strong> — use <code>@ControllerAdvice</code> to return consistent JSON errors</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card-grid">
+      <div class="card db-accent">
+        <h3>📦 Scalability</h3>
+        <ul class="chk">
+          <li class="good"><strong>Add pagination</strong> — all list endpoints should use <code>Pageable</code> from Spring Data</li>
+          <li class="good"><strong>Cache schedule reads</strong> — use Spring Cache + Redis for timetable queries (read-heavy)</li>
+          <li class="good"><strong>Async generation</strong> — run schedule generation in a background thread (<code>@Async</code>) for large datasets</li>
+          <li class="good"><strong>Index FK columns</strong> — add DB indexes on <code>teacher_id</code>, <code>room_id</code>, <code>day_of_week</code> in schedules table</li>
+        </ul>
+      </div>
+      <div class="card purple-accent">
+        <h3>🔮 Future Improvements</h3>
+        <ul class="chk">
+          <li><strong>OptaPlanner</strong> — replace greedy algorithm with a proper CSP solver for better schedules</li>
+          <li><strong>WebSocket / SSE</strong> — push schedule updates to students/teachers in real-time</li>
+          <li><strong>Email notifications</strong> — use Spring Mail when schedule is published or changed</li>
+          <li><strong>PDF export</strong> — generate printable timetables using iText or JasperReports</li>
+          <li><strong>Docker</strong> — containerize Spring Boot + React + PostgreSQL together</li>
+        </ul>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ⑩ FIND & REPLACE -->
+  <section class="section" id="findreplace">
+    <div class="section-header">
+      <div class="section-num">10</div>
+      <h2>Find &amp; Replace Reference</h2>
+    </div>
+
+    <table class="fr-table">
+      <thead>
+        <tr><th>Placeholder</th><th>Description</th><th>Example value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="ph">YOUR_DB_HOST</td><td>PostgreSQL server host</td><td class="rep">localhost</td></tr>
+        <tr><td class="ph">YOUR_DB_PORT</td><td>PostgreSQL port</td><td class="rep">5432</td></tr>
+        <tr><td class="ph">YOUR_DB_NAME</td><td>Database name</td><td class="rep">timecraft_db</td></tr>
+        <tr><td class="ph">YOUR_DB_USER</td><td>DB username</td><td class="rep">timecraft_user</td></tr>
+        <tr><td class="ph">YOUR_DB_PASSWORD</td><td>DB password</td><td class="rep">secure_password_here</td></tr>
+        <tr><td class="ph">YOUR_JWT_SECRET</td><td>JWT signing key (min 32 chars)</td><td class="rep">timecraft_super_secret_key_2025!</td></tr>
+        <tr><td class="ph">YOUR_JWT_EXPIRY_MS</td><td>Access token expiry in ms</td><td class="rep">900000 (15 min)</td></tr>
+        <tr><td class="ph">YOUR_BACKEND_PORT</td><td>Spring Boot server port</td><td class="rep">8080</td></tr>
+        <tr><td class="ph">YOUR_FRONTEND_PORT</td><td>React dev server port</td><td class="rep">3000</td></tr>
+        <tr><td class="ph">YOUR_API_BASE_URL</td><td>React .env — Axios base URL</td><td class="rep">http://localhost:8080/api</td></tr>
+        <tr><td class="ph">YOUR_CORS_ORIGIN</td><td>Allowed CORS origin in Spring</td><td class="rep">http://localhost:3000</td></tr>
+        <tr><td class="ph">YOUR_APP_PACKAGE</td><td>Java base package name</td><td class="rep">com.timecraft</td></tr>
+      </tbody>
+    </table>
+
+    <div class="arch-box" style="margin-top:14px;">
+      <div class="arch-title">application.yml — key config template</div>
+      <div class="arch-body">
+<pre>
+spring:
+  datasource:
+    url: jdbc:postgresql://<span class="hi">YOUR_DB_HOST</span>:<span class="hi">YOUR_DB_PORT</span>/<span class="hi">YOUR_DB_NAME</span>
+    username: <span class="hi">YOUR_DB_USER</span>
+    password: <span class="hi">YOUR_DB_PASSWORD</span>
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: <span class="hi">YOUR_BACKEND_PORT</span>
+
+jwt:
+  secret: <span class="hi">YOUR_JWT_SECRET</span>
+  expiration: <span class="hi">YOUR_JWT_EXPIRY_MS</span>
+
+cors:
+  allowed-origin: <span class="hi">YOUR_CORS_ORIGIN</span>
+</pre>
+      </div>
+    </div>
+
+    <div class="arch-box">
+      <div class="arch-title">frontend/.env — React config template</div>
+      <div class="arch-body">
+<pre>
+VITE_API_BASE_URL=<span class="hi-r">YOUR_API_BASE_URL</span>
+</pre>
+      </div>
+    </div>
+
+  </section>
+
+  <hr style="border:none;border-top:1px solid var(--border);margin:32px 0;">
+  <div style="text-align:center;padding:20px 0 48px;color:var(--dim);font-size:12px;font-family:'DM Mono',monospace;">
+    TimeCraft Architecture Guide · Spring Boot + React JSX + PostgreSQL + Flyway · All placeholders prefixed YOUR_
+  </div>
+
+</div>
+</main>
+
+<script>
+function go(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+  }
+}
+
+const main = document.querySelector('.main');
+const sections = document.querySelectorAll('.section[id]');
+const navLinks = document.querySelectorAll('.nav-link');
+
+main.addEventListener('scroll', () => {
+  let current = '';
+  const scrollTop = main.scrollTop + 80;
+  sections.forEach(s => { if (s.offsetTop <= scrollTop) current = s.id; });
+  navLinks.forEach(n => {
+    n.classList.remove('active');
+    if (n.getAttribute('onclick')?.includes(`'${current}'`)) n.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
