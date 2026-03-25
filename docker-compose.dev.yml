@@ -1,0 +1,30 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CosmoChat — LOCAL DEVELOPMENT ONLY
+# Runs only PostgreSQL in Docker.
+# You run Spring Boot and React normally on your laptop.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   Then start Spring Boot in IntelliJ and React with: npm run dev
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: chatbox_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chatbox
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "1234"
+    ports:
+      # Exposed to localhost so IntelliJ/Spring Boot can connect normally
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_dev_data:
+    driver: local
