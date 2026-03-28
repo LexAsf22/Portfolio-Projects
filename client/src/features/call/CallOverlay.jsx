@@ -98,12 +98,7 @@ export default function CallOverlay({ mode, myName, isCaller, stompClient, onEnd
           setStatus("Not connected to server");
         }
       } catch (err) {
-        if (!mounted) return;
-        setStatus(
-          err.name === "NotAllowedError"
-            ? "Permission denied"
-            : "Error: " + err.message
-        );
+        if (err.name !== "NotAllowedError") setStatus("Screen share failed: " + err.message);
       }
     };
 

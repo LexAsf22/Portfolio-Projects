@@ -1,6 +1,7 @@
 package com.bench.ws.security;
 
 import java.io.IOException;
+import java.util.Set;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +21,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
 
+    // FIX: Single clean set of public paths — no duplication, no dead code
+    private static final Set<String> PUBLIC_PATHS = Set.of(
+        "/auth/login",
+        "/auth/register",
+        "/auth/2fa/verify"
+    );
+
+    // FIX: Prefixes that are public (WebSocket handshake + static file serving)
+    // NOTE: /upload (POST) is NOT here — it requires authentication
+    private static final Set<String> PUBLIC_PREFIXES = Set.of(
+        "/ws",
+        "/uploads"
+    );
+
     public JwtAuthenticationFilter(JwtUtil jwtUtil,
                                    CustomUserDetailsService userDetailsService) {
         this.jwtUtil = jwtUtil;
@@ -33,27 +48,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path = request.getRequestURI();
-        if (path.equals("/auth/login")      ||
-            path.equals("/auth/register")   ||
-            path.equals("/auth/2fa/verify") ||
-            path.startsWith("/ws")          ||
-            path.startsWith("/upload")      ||
-            path.startsWith("/uploads")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
 
-        // ✅ FIXED: Only skip truly public endpoints.
-        // Do NOT skip all of /auth/** — protected auth routes need JWT processing.
-        boolean isPublic =
-            path.equals("/auth/login")       ||
-            path.equals("/auth/register")    ||
-            path.equals("/auth/2fa/verify")  ||
-            path.startsWith("/ws")           ||
-            path.startsWith("/upload")       ||
-            path.startsWith("/uploads");
-
-        if (isPublic) {
+        // FIX: Single public path check — clean, no duplication
+        if (isPublicPath(path)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -79,12 +76,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             } catch (Exception e) {
-                // Token is invalid/expired — SecurityContext stays null,
-                // Spring Security will return 401/403 as configured
-                logger.warn("JWT validation failed for path " + path + ": " + e.getMessage());
+                // FIX: Don't log the full token — only log path and message
+                logger.warn("JWT validation failed for [" +
+                    request.getMethod() + " " + path + "]: " + e.getMessage());
+                // SecurityContext stays empty → Spring Security returns 401
             }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isPublicPath(String path) {
+        if (PUBLIC_PATHS.contains(path)) return true;
+        for (String prefix : PUBLIC_PREFIXES) {
+            if (path.startsWith(prefix)) return true;
+        }
+        return false;
     }
 }

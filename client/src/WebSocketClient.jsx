@@ -273,7 +273,7 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
       setRemoteStreams(prev => ({ ...prev, [peerId]: e.streams[0] }));
       setStatus("Connected");
       if (!durTimer.current) { durTimer.current = setInterval(() => setSecs(s => s + 1), 1000); }
-      try { const ctx = new AudioContext(); const src = ctx.createMediaStreamSource(e.streams[0]); const analyser = ctx.createAnalyser(); analyser.fftSize = 256; src.connect(analyser); const data = new Uint8Array(analyser.frequencyBinCount); const check = () => { analyser.getByteFrequencyData(data); const vol = data.reduce((a, b) => a + b, 0) / data.length; if (vol > 18) setActiveSpeaker(peerId); requestAnimationFrame(check); }; check(); } catch (_) {}
+      try { const ctx = new AudioContext(); const src = ctx.createMediaStreamSource(e.streams[0]); const analyser = ctx.createAnalyser(); analyser.fftSize = 256; src.connect(analyser); const data = new Uint8Array(analyser.frequencyBinCount); const check = () => { analyser.getByteFrequencyData(data); const vol = data.reduce((a, b) => a + b, 0) / data.length; if (vol > 18) setActiveSpeaker(peerId); requestAnimationFrame(check); }; check(); } catch (_) { }
     };
     pc.onicecandidate = (e) => { if (e.candidate) { publish({ sender: myName, target: peerId, type: "ICE", callRoom: "channel1", payload: JSON.stringify(e.candidate) }); } };
     pc.oniceconnectionstatechange = () => { if (pc.iceConnectionState === "disconnected") { clearTimeout(endTimeout.current); endTimeout.current = setTimeout(() => { if (["disconnected", "failed"].includes(pc.iceConnectionState)) { removePeer(peerId); } }, 8000); if (asInitiator) pc.restartIce(); } else if (pc.iceConnectionState === "failed") { if (asInitiator) { pc.restartIce(); } else { removePeer(peerId); } } else if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") { clearTimeout(endTimeout.current); } };
@@ -287,9 +287,9 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
     const peerId = sig.sender;
     if (sig.type === "PEER_JOIN") { const shouldInitiate = myName > peerId; createPeer(peerId, shouldInitiate); if (!shouldInitiate) { publish({ sender: myName, target: peerId, type: "PEER_JOIN", callRoom: "channel1", payload: "" }); } return; }
     if (sig.type === "PEER_LEAVE") { removePeer(peerId); return; }
-    if (sig.type === "OFFER") { const peerState = peersRef.current[peerId] || {}; if (peerState.offerProcessing) return; peerState.offerProcessing = true; peerState.answerSent = false; peersRef.current[peerId] = peerState; const pc = createPeer(peerId, false); try { const sdp = JSON.parse(sig.payload); await pc.setRemoteDescription(new RTCSessionDescription(sdp)); peerState.remoteDescSet = true; for (const c of (peerState.pendingCandidates || [])) { try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {} } peerState.pendingCandidates = []; const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); peerState.answerSent = true; publish({ sender: myName, target: peerId, type: "ANSWER", callRoom: "channel1", payload: JSON.stringify(answer) }); } catch (err) { console.error("OFFER handling error:", err); } finally { peerState.offerProcessing = false; } return; }
-    if (sig.type === "ANSWER") { const peerState = peersRef.current[peerId]; if (!peerState?.pc) return; if (peerState.pc.signalingState === "stable") return; try { await peerState.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload))); peerState.remoteDescSet = true; for (const c of (peerState.pendingCandidates || [])) { try { await peerState.pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) {} } peerState.pendingCandidates = []; } catch (err) { console.error("ANSWER error:", err); } return; }
-    if (sig.type === "ICE") { const peerState = peersRef.current[peerId]; if (!peerState?.pc) return; const candidate = JSON.parse(sig.payload); if (peerState.remoteDescSet) { try { await peerState.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) {} } else { peerState.pendingCandidates = [...(peerState.pendingCandidates || []), candidate]; } return; }
+    if (sig.type === "OFFER") { const peerState = peersRef.current[peerId] || {}; if (peerState.offerProcessing) return; peerState.offerProcessing = true; peerState.answerSent = false; peersRef.current[peerId] = peerState; const pc = createPeer(peerId, false); try { const sdp = JSON.parse(sig.payload); await pc.setRemoteDescription(new RTCSessionDescription(sdp)); peerState.remoteDescSet = true; for (const c of (peerState.pendingCandidates || [])) { try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) { } } peerState.pendingCandidates = []; const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); peerState.answerSent = true; publish({ sender: myName, target: peerId, type: "ANSWER", callRoom: "channel1", payload: JSON.stringify(answer) }); } catch (err) { console.error("OFFER handling error:", err); } finally { peerState.offerProcessing = false; } return; }
+    if (sig.type === "ANSWER") { const peerState = peersRef.current[peerId]; if (!peerState?.pc) return; if (peerState.pc.signalingState === "stable") return; try { await peerState.pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload))); peerState.remoteDescSet = true; for (const c of (peerState.pendingCandidates || [])) { try { await peerState.pc.addIceCandidate(new RTCIceCandidate(c)); } catch (_) { } } peerState.pendingCandidates = []; } catch (err) { console.error("ANSWER error:", err); } return; }
+    if (sig.type === "ICE") { const peerState = peersRef.current[peerId]; if (!peerState?.pc) return; const candidate = JSON.parse(sig.payload); if (peerState.remoteDescSet) { try { await peerState.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) { } } else { peerState.pendingCandidates = [...(peerState.pendingCandidates || []), candidate]; } return; }
     if (sig.type === "END") { removePeer(peerId); }
   };
   useEffect(() => {
@@ -306,7 +306,7 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
           pc.ontrack = (e) => {
             if (e.streams[0]) {
               const screenVid = document.getElementById("screen-share-video");
-              if (screenVid) { screenVid.srcObject = e.streams[0]; screenVid.play().catch(() => {}); }
+              if (screenVid) { screenVid.srcObject = e.streams[0]; screenVid.play().catch(() => { }); }
               document.getElementById("screen-share-banner")?.style && (document.getElementById("screen-share-banner").style.display = "flex");
             }
           };
@@ -317,10 +317,10 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
           stompClient.current.publish({ destination: "/app/screen.share", body: JSON.stringify({ sender: myName, target: sig.sender, type: "SCREEN_ANSWER", roomId: "channel1", payload: JSON.stringify(answer) }) });
         } else if (sig.type === "SCREEN_ANSWER") {
           const pc = screenPeerRef.current[sig.sender];
-          if (pc && pc.signalingState !== "stable") { try { await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload))); } catch (_) {} }
+          if (pc && pc.signalingState !== "stable") { try { await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(sig.payload))); } catch (_) { } }
         } else if (sig.type === "SCREEN_ICE") {
           const pc = screenPeerRef.current[sig.sender];
-          if (pc) { try { await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(sig.payload))); } catch (_) {} }
+          if (pc) { try { await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(sig.payload))); } catch (_) { } }
         } else if (sig.type === "SCREEN_STOP") {
           const banner = document.getElementById("screen-share-banner");
           if (banner) banner.style.display = "none";
@@ -340,7 +340,7 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
         const stream = await navigator.mediaDevices.getUserMedia(mode === "video" ? { audio: true, video: { width: 1280, height: 720, facingMode: "user" } } : { audio: true, video: false });
         if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
         localStream.current = stream;
-        if (mode === "video" && localRef.current) { localRef.current.srcObject = stream; localRef.current.play().catch(() => {}); }
+        if (mode === "video" && localRef.current) { localRef.current.srcObject = stream; localRef.current.play().catch(() => { }); }
         if (stompClient?.current?.connected) {
           signalSub.current = stompClient.current.subscribe("/topic/call-signal", msg => { handleSignal(JSON.parse(msg.body)); });
           publish({ sender: myName, type: "PEER_JOIN", callRoom: "channel1", payload: "" });
@@ -362,32 +362,32 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
     };
     init();
     return () => {
-        mounted = false;
-        clearInterval(durTimer.current);
-        clearTimeout(endTimeout.current);
-        Object.values(peersRef.current).forEach(({ pc }) => pc?.close());
-        peersRef.current = {};
-        if (localStream.current) { localStream.current.getTracks().forEach(t => t.stop()); localStream.current = null; }
-        if (screenStreamRef.current) { screenStreamRef.current.getTracks().forEach(t => t.stop()); screenStreamRef.current = null; }
-        Object.values(screenPeerRef.current).forEach(pc => pc?.close());
-        screenPeerRef.current = {};
-        screenSubRef.current?.unsubscribe();
-        signalSub.current?.unsubscribe();
-        if (stompClient?.current?.connected) { stompClient.current.publish({ destination: "/app/call-signal", body: JSON.stringify({ sender: myName, type: "PEER_LEAVE", callRoom: "channel1", payload: "" }) }); }
-      };
+      mounted = false;
+      clearInterval(durTimer.current);
+      clearTimeout(endTimeout.current);
+      Object.values(peersRef.current).forEach(({ pc }) => pc?.close());
+      peersRef.current = {};
+      if (localStream.current) { localStream.current.getTracks().forEach(t => t.stop()); localStream.current = null; }
+      if (screenStreamRef.current) { screenStreamRef.current.getTracks().forEach(t => t.stop()); screenStreamRef.current = null; }
+      Object.values(screenPeerRef.current).forEach(pc => pc?.close());
+      screenPeerRef.current = {};
+      screenSubRef.current?.unsubscribe();
+      signalSub.current?.unsubscribe();
+      if (stompClient?.current?.connected) { stompClient.current.publish({ destination: "/app/call-signal", body: JSON.stringify({ sender: myName, type: "PEER_LEAVE", callRoom: "channel1", payload: "" }) }); }
+    };
   }, []); // eslint-disable-line
   const videoRefs = useRef({});
-  useEffect(() => { Object.entries(remoteStreams).forEach(([peerId, stream]) => { const el = videoRefs.current[peerId]; if (el && el.srcObject !== stream) { el.srcObject = stream; el.play().catch(() => {}); } }); }, [remoteStreams]);
+  useEffect(() => { Object.entries(remoteStreams).forEach(([peerId, stream]) => { const el = videoRefs.current[peerId]; if (el && el.srcObject !== stream) { el.srcObject = stream; el.play().catch(() => { }); } }); }, [remoteStreams]);
   // ✅ Assign local screen stream to its video element when it becomes available
   useEffect(() => {
     if (screenLocalRef.current && localScreenStream) {
       screenLocalRef.current.srcObject = localScreenStream;
-      screenLocalRef.current.play().catch(() => {});
+      screenLocalRef.current.play().catch(() => { });
     }
     // ✅ When screen share stops, reattach camera to localRef
     if (!localScreenStream && localRef.current && localStream.current) {
       localRef.current.srcObject = localStream.current;
-      localRef.current.play().catch(() => {});
+      localRef.current.play().catch(() => { });
     }
   }, [localScreenStream]);
 
@@ -443,11 +443,11 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
           })();
         });
       } catch (err) {
-        if (err.name !== "NotAllowedError") alert("Screen share error: " + err.message);
+        if (err.name !== "NotAllowedError") showToast("Screen share error: " + err.message);
       }
     })();
   }, [screenShareRequested]); // eslint-disable-line
-  useEffect(() => { if (localRef.current && localStream.current && mode === "video") { localRef.current.srcObject = localStream.current; localRef.current.play().catch(() => {}); } }, [mode]);
+  useEffect(() => { if (localRef.current && localStream.current && mode === "video") { localRef.current.srcObject = localStream.current; localRef.current.play().catch(() => { }); } }, [mode]);
   const toggleMute = () => { const nowMuted = !muted; localStream.current?.getAudioTracks().forEach(t => { t.enabled = !nowMuted; }); setMuted(nowMuted); };
   const toggleCam = () => { const nowOff = !camOff; localStream.current?.getVideoTracks().forEach(t => { t.enabled = !nowOff; }); setCamOff(nowOff); };
   const peers = Object.keys(remoteStreams);
@@ -499,7 +499,7 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
               {/* Bottom strip: all camera tiles */}
               <div style={{ display: "flex", gap: 8, height: 120, flexShrink: 0 }}>
                 <div style={{ ...tileBase(false), width: 160, height: 120, flexShrink: 0 }}>
-                  <video ref={el => { localRef.current = el; if (el && localStream.current && el.srcObject !== localStream.current) { el.srcObject = localStream.current; el.play().catch(() => {}); } }} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: camOff ? "none" : "block", transform: "scaleX(-1)" }} />
+                  <video ref={el => { localRef.current = el; if (el && localStream.current && el.srcObject !== localStream.current) { el.srcObject = localStream.current; el.play().catch(() => { }); } }} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: camOff ? "none" : "block", transform: "scaleX(-1)" }} />
                   {camOff && <div style={{ ...avatarStyle, width: 40, height: 40, fontSize: 16 }}>{myName[0]?.toUpperCase()}</div>}
                   <div style={{ ...nameTagStyle, fontSize: 10, padding: "3px 7px" }}>{muted && <span>🔇</span>}<span>{myName} (You)</span></div>
                 </div>
@@ -516,7 +516,7 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
               {/* Normal grid layout when no screen share */}
               <div style={{ flex: 1, display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: 8, minHeight: 0 }}>
                 <div style={tileBase(false)}>
-                  <video ref={el => { localRef.current = el; if (el && localStream.current && el.srcObject !== localStream.current) { el.srcObject = localStream.current; el.play().catch(() => {}); } }} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: camOff ? "none" : "block", transform: "scaleX(-1)" }} />
+                  <video ref={el => { localRef.current = el; if (el && localStream.current && el.srcObject !== localStream.current) { el.srcObject = localStream.current; el.play().catch(() => { }); } }} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: camOff ? "none" : "block", transform: "scaleX(-1)" }} />
                   {camOff && <div style={avatarStyle}>{myName[0]?.toUpperCase()}</div>}
                   <div style={nameTagStyle}>{muted && <span style={{ fontSize: 10 }}>🔇</span>}<span>{myName} (You)</span></div>
                 </div>
@@ -542,11 +542,11 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
           {peers.map(peerId => (
             <div key={peerId} style={tileBase(activeSpeaker === peerId)}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-                <div style={{ ...avatarStyle, animation: activeSpeaker === peerId ? "speakRing 1s infinite" : "none", background: `linear-gradient(135deg, ${["#c46dff","#06b6d4","#ec4899","#059669","#f59e0b"][peerId.charCodeAt(0) % 5]}, #7b8cff)` }}>{peerId[0]?.toUpperCase()}</div>
+                <div style={{ ...avatarStyle, animation: activeSpeaker === peerId ? "speakRing 1s infinite" : "none", background: `linear-gradient(135deg, ${["#c46dff", "#06b6d4", "#ec4899", "#059669", "#f59e0b"][peerId.charCodeAt(0) % 5]}, #7b8cff)` }}>{peerId[0]?.toUpperCase()}</div>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.8)" }}>{peerId}</span>
                 <span style={{ fontSize: 11, color: activeSpeaker === peerId ? "#22c55e" : "rgba(255,255,255,0.3)" }}>{activeSpeaker === peerId ? "🎙 Speaking" : "○ Silent"}</span>
               </div>
-              <audio ref={el => { if (el && streamsRef.current[peerId] && el.srcObject !== streamsRef.current[peerId]) { el.srcObject = streamsRef.current[peerId]; el.play().catch(() => {}); } }} autoPlay style={{ display: "none" }} />
+              <audio ref={el => { if (el && streamsRef.current[peerId] && el.srcObject !== streamsRef.current[peerId]) { el.srcObject = streamsRef.current[peerId]; el.play().catch(() => { }); } }} autoPlay style={{ display: "none" }} />
             </div>
           ))}
         </div>
@@ -590,8 +590,8 @@ function CallOverlay({ mode, myName, stompClient, onEnd, onMinimize }) {
   );
 }
 
-const EMOJIS = ["😀","😂","😍","😎","😭","😅","🤔","😤","🥰","😇","🤣","😊","😋","😜","🤩","🥳","😏","😒","😔","😳","👍","👎","👏","🙌","🤝","🙏","👋","💪","🤜","✌️","❤️","🧡","💛","💚","💙","💜","🖤","💔","💕","💯","🔥","⭐","✨","🎉","🎊","🎁","🏆","🎯","💡","🚀","😈","👻","💀","🤖","👽","🐶","🐱","🐭","🦊","🐻","🍕","🍔","🍟","🌮","🍜","🍣","🍩","🍪","☕","🧋","⚽","🏀","🎮","🎵","🎬","📸","💻","📱","🌈","🌙"];
-const QUICK_REACTIONS = ["❤️","😂","😮","😢","😡","👍","👎","🔥"];
+const EMOJIS = ["😀", "😂", "😍", "😎", "😭", "😅", "🤔", "😤", "🥰", "😇", "🤣", "😊", "😋", "😜", "🤩", "🥳", "😏", "😒", "😔", "😳", "👍", "👎", "👏", "🙌", "🤝", "🙏", "👋", "💪", "🤜", "✌️", "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "💔", "💕", "💯", "🔥", "⭐", "✨", "🎉", "🎊", "🎁", "🏆", "🎯", "💡", "🚀", "😈", "👻", "💀", "🤖", "👽", "🐶", "🐱", "🐭", "🦊", "🐻", "🍕", "🍔", "🍟", "🌮", "🍜", "🍣", "🍩", "🍪", "☕", "🧋", "⚽", "🏀", "🎮", "🎵", "🎬", "📸", "💻", "📱", "🌈", "🌙"];
+const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍", "👎", "🔥"];
 
 function ReactionPicker({ onSelect, style }) {
   return (
@@ -609,7 +609,7 @@ function EmojiPicker({ onSelect, emojiRef }) {
   );
 }
 
-function CreateRoomModal({ onClose, onCreate }) {
+function CreateRoomModal({ onClose, onCreate, error }) {
   const [step, setStep] = useState("template");
   const [template, setTemplate] = useState(null);
   const [roomName, setRoomName] = useState("");
@@ -630,7 +630,11 @@ function CreateRoomModal({ onClose, onCreate }) {
   ];
   const selectedTemplate = templates.find(t => t.id === template);
   const handleTemplateSelect = (t) => { setTemplate(t.id); setRoomName(t.id === "own" ? "" : t.label + " Room"); setStep("configure"); };
-  const handleCreate = () => { if (!roomName.trim()) return; onCreate({ name: roomName.trim(), template, emoji: selectedTemplate?.emoji || "🌟", type: roomType }); onClose(); };
+  const handleCreate = () => {
+    if (!roomName.trim()) return;
+    // FIX: removed onClose() here — parent closes modal only on success
+    onCreate({ name: roomName.trim(), template, emoji: selectedTemplate?.emoji || "🌟", type: roomType });
+  };
   const overlay = { position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.15s", padding: 20 };
   const modal = { width: "100%", maxWidth: 460, background: "var(--glass2)", borderRadius: 20, border: "1px solid var(--glass-border)", boxShadow: "0 32px 80px rgba(0,0,0,0.5)", overflow: "hidden", animation: "scalePop 0.2s cubic-bezier(0.34,1.56,0.64,1)" };
   const inputStyle = { width: "100%", background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 10, padding: "11px 14px", fontFamily: "inherit", fontSize: 14, color: "var(--text)", outline: "none" };
@@ -671,6 +675,11 @@ function CreateRoomModal({ onClose, onCreate }) {
                 </div>
               ))}
             </div>
+            {error && (
+              <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", color: "#fb7185", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
+                ⚠️ {error}
+              </div>
+            )}
             <button onClick={handleCreate} disabled={!roomName.trim()} style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: roomName.trim() ? "linear-gradient(135deg,#7c3aed,#a855f7)" : "var(--btn-bg)", color: roomName.trim() ? "#fff" : "var(--text-muted)", fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: roomName.trim() ? "pointer" : "not-allowed", transition: "all 0.2s", boxShadow: roomName.trim() ? "0 4px 20px rgba(124,58,237,0.35)" : "none" }}>Create Room ✨</button>
           </div>
         )}
@@ -719,10 +728,51 @@ function SettingsModal({ onClose, tab, setTab, dark, setDark, theme, setTheme, a
   const tabs = [{ id: "account", label: "👤 My Account", group: "USER SETTINGS" }, { id: "profile", label: "🪪 Profile", group: "USER SETTINGS" }, { id: "privacy", label: "🔒 Privacy & Safety", group: "USER SETTINGS" }, { id: "appearance", label: "🎨 Appearance", group: "APP SETTINGS" }, { id: "notifications", label: "🔔 Notifications", group: "APP SETTINGS" }, { id: "danger", label: "⚠️ Danger Zone", group: "ACCOUNT" }];
   const groups = [...new Set(tabs.map(t => t.group))];
   const [verifyCode, setVerifyCode] = useState(""); const [codeSent, setCodeSent] = useState(false); const [sendingCode, setSendingCode] = useState(false);
-  const sendCode = async () => { setSendingCode(true); setPwMsg(null); try { const res = await fetch(`${BASE}/auth/send-code`, { method: "POST", headers: { Authorization: `Bearer ${authToken}` } }); const data = await res.json(); if (!res.ok) { setPwMsg({ ok: false, text: data.error }); setSendingCode(false); return; } setCodeSent(true); setPwMsg({ ok: true, text: data.message }); } catch { setPwMsg({ ok: false, text: "Server error" }); } setSendingCode(false); };
-  const changePassword = async () => { if (!verifyCode || !newPw || !confirmPw) { setPwMsg({ ok: false, text: "Fill in all fields" }); return; } if (newPw !== confirmPw) { setPwMsg({ ok: false, text: "New passwords do not match" }); return; } if (newPw.length < 6) { setPwMsg({ ok: false, text: "Password must be at least 6 characters" }); return; } try { const res = await fetch(`${BASE}/auth/change-password`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ code: verifyCode, newPassword: newPw }) }); const data = await res.json(); if (!res.ok) { setPwMsg({ ok: false, text: data.error }); return; } setPwMsg({ ok: true, text: "Password changed successfully!" }); setVerifyCode(""); setNewPw(""); setConfirmPw(""); setCodeSent(false); } catch { setPwMsg({ ok: false, text: "Server error" }); } };
-  const saveEmail = async () => { setEmailMsg(null); if (!email.trim()) { setEmailMsg({ ok: false, text: "Email cannot be empty." }); return; } if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailMsg({ ok: false, text: "Please enter a valid email address." }); return; } try { const res = await fetch(`${BASE}/auth/update-email`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newEmail: email }) }); if (!res.ok) { setEmailMsg({ ok: false, text: "Failed to update email" }); return; } setEmailMsg({ ok: true, text: "Email updated!" }); onUpdateProfile({ email }); } catch { setEmailMsg({ ok: false, text: "Server error" }); } };
-  const saveProfile = async () => { try { const res = await fetch(`${BASE}/auth/profile`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ displayName, bio }) }); const data = await res.json(); onUpdateProfile(data); setProfileMsg({ ok: true, text: "Profile saved!" }); } catch { setProfileMsg({ ok: false, text: "Server error" }); } };
+  const sendCode = async () => {
+    setSendingCode(true); setPwMsg(null);
+    try {
+      const res = await fetch(`${BASE}/auth/send-code`, { method: "POST", headers: { Authorization: `Bearer ${authToken}` } });
+      const data = await res.json();
+      if (!res.ok) { setPwMsg({ ok: false, text: data.error || "Failed to send code" }); setSendingCode(false); return; }
+      setCodeSent(true); setPwMsg({ ok: true, text: data.message || "Code sent to your email!" });
+    } catch { setPwMsg({ ok: false, text: "Server error. Check your connection." }); }
+    setSendingCode(false);
+  };
+  const changePassword = async () => {
+    setPwMsg(null);
+    if (!verifyCode || !newPw || !confirmPw) { setPwMsg({ ok: false, text: "Fill in all fields" }); return; }
+    if (newPw !== confirmPw) { setPwMsg({ ok: false, text: "New passwords do not match" }); return; }
+    if (newPw.length < 6) { setPwMsg({ ok: false, text: "Password must be at least 6 characters" }); return; }
+    try {
+      const res = await fetch(`${BASE}/auth/change-password`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ code: verifyCode, newPassword: newPw }) });
+      const data = await res.json();
+      if (!res.ok) { setPwMsg({ ok: false, text: data.error || "Failed to change password" }); return; }
+      setPwMsg({ ok: true, text: "Password changed successfully!" });
+      setVerifyCode(""); setNewPw(""); setConfirmPw(""); setCodeSent(false);
+    } catch { setPwMsg({ ok: false, text: "Server error. Please try again." }); }
+  };
+  const saveEmail = async () => {
+    setEmailMsg(null);
+    if (!email.trim()) { setEmailMsg({ ok: false, text: "Email cannot be empty." }); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailMsg({ ok: false, text: "Please enter a valid email address." }); return; }
+    try {
+      const res = await fetch(`${BASE}/auth/update-email`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newEmail: email }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setEmailMsg({ ok: false, text: data.error || "Failed to update email" }); return; }
+      setEmailMsg({ ok: true, text: "Email updated successfully!" });
+      onUpdateProfile({ email });
+    } catch { setEmailMsg({ ok: false, text: "Server error. Check your connection." }); }
+  };
+  const saveProfile = async () => {
+    setProfileMsg(null);
+    try {
+      const res = await fetch(`${BASE}/auth/profile`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ displayName, bio }) });
+      const data = await res.json();
+      if (!res.ok) { setProfileMsg({ ok: false, text: data.error || "Failed to save profile" }); return; }
+      onUpdateProfile(data);
+      setProfileMsg({ ok: true, text: "Profile saved!" });
+    } catch { setProfileMsg({ ok: false, text: "Server error. Check your connection." }); }
+  };
   const uploadAvatar = async (file) => { const fd = new FormData(); fd.append("file", file); try { const res = await fetch(`${BASE}/auth/profile/avatar`, { method: "POST", headers: { Authorization: `Bearer ${authToken}` }, body: fd }); const data = await res.json(); onUpdateProfile({ avatarUrl: data.avatarUrl }); } catch { } };
   const inputStyle = { width: "100%", background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 10, padding: "10px 14px", fontFamily: "inherit", fontSize: 14, color: "var(--text)", outline: "none", marginBottom: 10 };
   const labelStyle = { display: "block", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 6 };
@@ -737,14 +787,24 @@ function SettingsModal({ onClose, tab, setTab, dark, setDark, theme, setTheme, a
 
   const renderContent = () => {
     if (tab === "account-email") return (<div><div style={sectionTitle}>Update Email Address</div><p style={sectionDesc}>This email is used for password reset verification codes.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>{emailMsg && <div style={msgStyle(emailMsg.ok)}>{emailMsg.ok ? "✅" : "⚠️"} {emailMsg.text}</div>}<label style={labelStyle}>New Email Address</label><input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" /><div style={{ display: "flex", gap: 10, marginTop: 4 }}><button style={saveBtn} onClick={async () => { setEmailMsg(null); if (!email.trim()) { setEmailMsg({ ok: false, text: "Email cannot be empty." }); return; } if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailMsg({ ok: false, text: "Please enter a valid email address." }); return; } try { const res = await fetch(`${BASE}/auth/update-email`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newEmail: email }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { setEmailMsg({ ok: false, text: data.error || data.message || `Error ${res.status}` }); return; } setEmailMsg({ ok: true, text: "Email updated successfully!" }); onUpdateProfile({ email }); setTimeout(() => setTab("account"), 1500); } catch { setEmailMsg({ ok: false, text: "Network error. Check your connection." }); } }}>Save Email</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => setTab("account")}>Cancel</button></div></div></div>);
-    if (tab === "account-username") return (<div><div style={sectionTitle}>Change Username</div><p style={sectionDesc}>Choose a new unique username. You will be issued a new login token.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>{pwMsg && <div style={msgStyle(pwMsg.ok)}>{pwMsg.ok ? "✅" : "⚠️"} {pwMsg.text}</div>}<label style={labelStyle}>New Username</label><input style={inputStyle} value={currentPw} onChange={e => setCurrentPw(e.target.value)} placeholder="Enter new username (3–32 chars, letters/numbers/_/.)" /><div style={{ display: "flex", gap: 10, marginTop: 4 }}><button style={saveBtn} onClick={async () => { setPwMsg(null); try { const res = await fetch(`${BASE}/auth/change-username`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newUsername: currentPw }) }); const data = await res.json(); if (!res.ok) { setPwMsg({ ok: false, text: data.error }); return; } setPwMsg({ ok: true, text: "Username changed! Please log in again." }); setTimeout(() => { onEndCall?.(); onLogout(); }, 1500); } catch { setPwMsg({ ok: false, text: "Server error" }); } }}>Save Username</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => setTab("account")}>Cancel</button></div></div></div>);
+    if (tab === "account-username") return (<div><div style={sectionTitle}>Change Username</div><p style={sectionDesc}>Choose a new unique username. You will be issued a new login token.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>{pwMsg && <div style={msgStyle(pwMsg.ok)}>{pwMsg.ok ? "✅" : "⚠️"} {pwMsg.text}</div>}<label style={labelStyle}>New Username</label><input style={inputStyle} value={currentPw} onChange={e => setCurrentPw(e.target.value)} placeholder="Enter new username (3–32 chars, letters/numbers/_/.)" /><div style={{ display: "flex", gap: 10, marginTop: 4 }}><button style={saveBtn} onClick={async () => {
+                  setPwMsg(null);
+                  if (!currentPw.trim()) { setPwMsg({ ok: false, text: "Username cannot be empty." }); return; }
+                  try {
+                    const res = await fetch(`${BASE}/auth/change-username`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newUsername: currentPw }) });
+                    const data = await res.json();
+                    if (!res.ok) { setPwMsg({ ok: false, text: data.error || "Failed to change username" }); return; }
+                    setPwMsg({ ok: true, text: "Username changed! Logging you out..." });
+                    setTimeout(() => { onEndCall?.(); onLogout(); }, 1500);
+                  } catch { setPwMsg({ ok: false, text: "Server error. Check your connection." }); }
+                }}>Save Username</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => setTab("account")}>Cancel</button></div></div></div>);
     if (tab === "account") return (<div><div style={{ background: "var(--bubble-me)", borderRadius: 12, padding: "40px 20px 20px", marginBottom: 24, position: "relative", overflow: "hidden" }}><div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,rgba(196,109,255,0.8),rgba(123,140,255,0.8))" }} /><div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 16 }}><div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()}><div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.2)", border: "4px solid var(--glass2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, color: "#fff", overflow: "hidden" }}>{myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : authUser?.[0]?.toUpperCase()}</div><div style={{ position: "absolute", bottom: 2, right: 2, width: 22, height: 22, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, border: "2px solid var(--glass2)" }}>✏️</div></div><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) uploadAvatar(e.target.files[0]); }} /><div><div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{myProfile?.displayName || authUser}</div><div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>@{authUser}</div></div></div></div><div style={sectionTitle}>Account Information</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px", marginBottom: 20 }}><Row label="Username" desc={`@${authUser}`}><button onClick={() => setTab("account-username")} style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }}>Change</button></Row><Row label="Email" desc={myProfile?.email || "No email set"}><button onClick={() => setTab("account-email")} style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }}>Edit</button></Row></div><div style={sectionTitle}>Change Password</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, marginBottom: 20 }}>{pwMsg && <div style={msgStyle(pwMsg.ok)}>{pwMsg.ok ? "✅" : "⚠️"} {pwMsg.text}</div>}{!codeSent ? (<><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14, lineHeight: 1.6 }}>A 6-digit verification code will be sent to your registered email address.{!myProfile?.email && <span style={{ color: "#fb7185" }}> You need to add an email address first.</span>}</div><button style={{ ...saveBtn, opacity: myProfile?.email ? 1 : 0.5, cursor: myProfile?.email ? "pointer" : "not-allowed" }} onClick={myProfile?.email ? sendCode : undefined} disabled={sendingCode}>{sendingCode ? "Sending…" : "Send Verification Code"}</button></>) : (<><label style={labelStyle}>Verification Code</label><input style={inputStyle} value={verifyCode} onChange={e => setVerifyCode(e.target.value)} placeholder="Enter 6-digit code" maxLength={6} /><label style={labelStyle}>New Password</label><input type="password" style={inputStyle} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Enter new password" /><label style={labelStyle}>Confirm New Password</label><input type="password" style={{ ...inputStyle, marginBottom: 14 }} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Confirm new password" /><div style={{ display: "flex", gap: 10 }}><button style={saveBtn} onClick={changePassword}>Change Password</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => { setCodeSent(false); setPwMsg(null); setVerifyCode(""); }}>Resend Code</button></div></>)}</div><div style={sectionTitle}>Email Address</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>{emailMsg && <div style={msgStyle(emailMsg.ok)}>{emailMsg.ok ? "✅" : "⚠️"} {emailMsg.text}</div>}<label style={labelStyle}>Email</label><input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" /><button style={saveBtn} onClick={saveEmail}>Save Email</button></div></div>);
     if (tab === "profile") return (<div><div style={sectionTitle}>Display Name</div><p style={sectionDesc}>This is how others see you in chat.</p>{profileMsg && <div style={msgStyle(profileMsg.ok)}>{profileMsg.ok ? "✅" : "⚠️"} {profileMsg.text}</div>}<div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, marginBottom: 20 }}><label style={labelStyle}>Display Name</label><input style={inputStyle} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your display name" /><label style={labelStyle}>Bio</label><textarea style={{ ...inputStyle, height: 80, resize: "none" }} value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell others about yourself" /><button style={saveBtn} onClick={saveProfile}>Save Profile</button></div><div style={sectionTitle}>Avatar</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, display: "flex", alignItems: "center", gap: 16 }}><div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--bubble-me)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", overflow: "hidden", flexShrink: 0 }}>{myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : authUser?.[0]?.toUpperCase()}</div><div><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 10 }}>JPG, GIF or PNG. Max size 8MB.</div><div style={{ display: "flex", gap: 8 }}><button style={saveBtn} onClick={() => fileRef.current?.click()}>Change Avatar</button><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) uploadAvatar(e.target.files[0]); }} /></div></div></div></div>);
-    if (tab === "appearance") return (<div><div style={sectionTitle}>Planet Theme</div><p style={sectionDesc}>Each planet transforms the entire UI — colors, accents, and atmosphere.</p><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 24 }}>{[{id:"galaxy",emoji:"🌌",label:"Galaxy"},{id:"mars",emoji:"🔴",label:"Mars"},{id:"neptune",emoji:"🔵",label:"Neptune"},{id:"venus",emoji:"🌕",label:"Venus"},{id:"blackhole",emoji:"⚫",label:"Black Hole"},{id:"nebula",emoji:"💜",label:"Nebula"}].map(th => (<button key={th.id} onClick={() => { setTheme(th.id); localStorage.setItem("theme", th.id); }} style={{ padding: "14px 8px", borderRadius: 12, border: `2px solid ${theme === th.id ? "var(--accent)" : "var(--glass-border)"}`, background: theme === th.id ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, transition: "all 0.15s" }}><span style={{ fontSize: 26 }}>{th.emoji}</span><span>{th.label}</span></button>))}</div>
+    if (tab === "appearance") return (<div><div style={sectionTitle}>Planet Theme</div><p style={sectionDesc}>Each planet transforms the entire UI — colors, accents, and atmosphere.</p><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 24 }}>{[{ id: "galaxy", emoji: "🌌", label: "Galaxy" }, { id: "mars", emoji: "🔴", label: "Mars" }, { id: "neptune", emoji: "🔵", label: "Neptune" }, { id: "venus", emoji: "🌕", label: "Venus" }, { id: "blackhole", emoji: "⚫", label: "Black Hole" }, { id: "nebula", emoji: "💜", label: "Nebula" }].map(th => (<button key={th.id} onClick={() => { setTheme(th.id); localStorage.setItem("theme", th.id); }} style={{ padding: "14px 8px", borderRadius: 12, border: `2px solid ${theme === th.id ? "var(--accent)" : "var(--glass-border)"}`, background: theme === th.id ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, transition: "all 0.15s" }}><span style={{ fontSize: 26 }}>{th.emoji}</span><span>{th.label}</span></button>))}</div>
       <div style={sectionTitle}>Font Size</div><p style={sectionDesc}>Scale the chat text to your preference.</p><div style={{ display: "flex", gap: 8, marginBottom: 24 }}>{["small", "medium", "large"].map(s => (<button key={s} onClick={() => { setFontSize(s); localStorage.setItem("fontSize", s); }} style={{ flex: 1, padding: "12px", borderRadius: 10, border: `2px solid ${fontSize === s ? "var(--accent)" : "var(--glass-border)"}`, background: fontSize === s ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: s === "small" ? 12 : s === "medium" ? 14 : 16, fontWeight: 600, cursor: "pointer", textTransform: "capitalize" }}>{s}</button>))}</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px" }}><Row label="Compact Mode" desc="Reduce spacing between messages"><Toggle on={compactMode} onChange={setCompactMode} /></Row></div></div>);
     if (tab === "notifications") return (<div><div style={sectionTitle}>Notifications</div><p style={sectionDesc}>Control how and when you get notified.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px" }}><Row label="Message Sound" desc="Play a sound when a message arrives"><Toggle on={notifSound} onChange={setNotifSound} /></Row><Row label="Desktop Notifications" desc="Show notifications outside the browser"><button style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }} onClick={() => Notification.requestPermission()}>{Notification.permission === "granted" ? "✅ Enabled" : "Enable"}</button></Row></div></div>);
     if (tab === "privacy") return (<div><div style={sectionTitle}>Privacy & Safety</div><p style={sectionDesc}>Control who can interact with you.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px", marginBottom: 20 }}><Row label="Who can DM me" desc="Control who can send you direct messages"><select value={privacyDm} onChange={e => setPrivacyDm(e.target.value)} style={{ background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 8, padding: "6px 12px", color: "var(--text)", fontFamily: "inherit", fontSize: 13, outline: "none" }}><option value="everyone">Everyone</option><option value="friends">Friends only</option><option value="nobody">Nobody</option></select></Row><Row label="Who can send friend requests" desc="Control who can add you as a friend"><select value={privacyFriend} onChange={e => setPrivacyFriend(e.target.value)} style={{ background: "var(--input-bg)", border: "1.5px solid var(--glass-border)", borderRadius: 8, padding: "6px 12px", color: "var(--text)", fontFamily: "inherit", fontSize: 13, outline: "none" }}><option value="everyone">Everyone</option><option value="nobody">Nobody</option></select></Row></div><div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>⚠️ Privacy settings are stored locally and enforced on the frontend only. Full server-side enforcement coming soon.</div></div>);
-    if (tab === "danger") return (<div><div style={{ ...sectionTitle, color: "#fb7185" }}>⚠️ Danger Zone</div><p style={sectionDesc}>These actions are irreversible. Please be careful.</p><div style={{ background: "rgba(251,113,133,0.07)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 10, padding: 20, marginBottom: 16 }}><div style={{ fontSize: 15, fontWeight: 700, color: "#fb7185", marginBottom: 6 }}>Log Out</div><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14 }}>Sign out of your account on this device.</div><button onClick={() => { onEndCall?.(); onLogout(); }} style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(251,113,133,0.3)", background: "rgba(251,113,133,0.15)", color: "#fb7185", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Log Out</button></div><div style={{ background: "rgba(251,113,133,0.07)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 10, padding: 20 }}><div style={{ fontSize: 15, fontWeight: 700, color: "#fb7185", marginBottom: 6 }}>Delete Account</div><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14 }}>Permanently delete your account and all your data. This cannot be undone.</div><button style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(251,113,133,0.4)", background: "#fb7185", color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer" }} onClick={async () => { if (!window.confirm("Permanently delete your account? This CANNOT be undone.")) return; const confirmed = window.prompt('Type "DELETE" to confirm:'); if (confirmed !== "DELETE") return; try { const res = await fetch(`${BASE}/auth/delete-account`, { method: "DELETE", headers: { Authorization: `Bearer ${authToken}` } }); if (res.ok) { onEndCall?.(); onLogout(); } else { const d = await res.json(); alert("Error: " + (d.error || "Could not delete account")); } } catch { alert("Server error. Try again."); } }}>Delete Account</button></div></div>);
+    if (tab === "danger") return (<div><div style={{ ...sectionTitle, color: "#fb7185" }}>⚠️ Danger Zone</div><p style={sectionDesc}>These actions are irreversible. Please be careful.</p><div style={{ background: "rgba(251,113,133,0.07)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 10, padding: 20, marginBottom: 16 }}><div style={{ fontSize: 15, fontWeight: 700, color: "#fb7185", marginBottom: 6 }}>Log Out</div><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14 }}>Sign out of your account on this device.</div><button onClick={() => { onEndCall?.(); onLogout(); }} style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(251,113,133,0.3)", background: "rgba(251,113,133,0.15)", color: "#fb7185", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Log Out</button></div><div style={{ background: "rgba(251,113,133,0.07)", border: "1px solid rgba(251,113,133,0.25)", borderRadius: 10, padding: 20 }}><div style={{ fontSize: 15, fontWeight: 700, color: "#fb7185", marginBottom: 6 }}>Delete Account</div><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14 }}>Permanently delete your account and all your data. This cannot be undone.</div><button style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(251,113,133,0.4)", background: "#fb7185", color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer" }} onClick={async () => { if (!window.confirm("Permanently delete your account? This CANNOT be undone.")) return; const confirmed = window.prompt('Type "DELETE" to confirm:'); if (confirmed !== "DELETE") return; try { const res = await fetch(`${BASE}/auth/delete-account`, { method: "DELETE", headers: { Authorization: `Bearer ${authToken}` } }); if (res.ok) { onEndCall?.(); onLogout(); } else { const d = await res.json().catch(() => ({})); setPwMsg({ ok: false, text: d.error || "Could not delete account. Try again." }); setTab("danger"); } } catch { showToast("Server error. Try again."); } }}>Delete Account</button></div></div>);
   };
 
   return (
@@ -847,10 +907,10 @@ function FriendsPage({ allUsers, onlineUsers, friends, friendReqs, incomingReqs,
                   <div style={{ display: "flex", gap: 8 }}>
                     {tab === "pending" ? (
                       <><button onClick={() => onAccept(user)} style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(35,165,90,0.15)", color: "#23a55a", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✓</button>
-                      <button onClick={() => onRemove(user)} style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(237,66,69,0.15)", color: "#ed4245", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button></>
+                        <button onClick={() => onRemove(user)} style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(237,66,69,0.15)", color: "#ed4245", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button></>
                     ) : (
-                      <><button onClick={() => onDm(user)} title="Message" style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "var(--btn-bg)", color: "var(--text-sub)", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.12s" }} onMouseEnter={e => e.currentTarget.style.background="var(--accent-soft)"} onMouseLeave={e => e.currentTarget.style.background="var(--btn-bg)"}>💬</button>
-                      <button onClick={() => onRemove(user)} title="More" style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "var(--btn-bg)", color: "var(--text-sub)", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.12s" }} onMouseEnter={e => e.currentTarget.style.background="var(--accent-soft)"} onMouseLeave={e => e.currentTarget.style.background="var(--btn-bg)"}>⋮</button></>
+                      <><button onClick={() => onDm(user)} title="Message" style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "var(--btn-bg)", color: "var(--text-sub)", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.12s" }} onMouseEnter={e => e.currentTarget.style.background = "var(--accent-soft)"} onMouseLeave={e => e.currentTarget.style.background = "var(--btn-bg)"}>💬</button>
+                        <button onClick={() => onRemove(user)} title="More" style={{ width: 34, height: 34, borderRadius: "50%", border: "none", background: "var(--btn-bg)", color: "var(--text-sub)", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.12s" }} onMouseEnter={e => e.currentTarget.style.background = "var(--accent-soft)"} onMouseLeave={e => e.currentTarget.style.background = "var(--btn-bg)"}>⋮</button></>
                     )}
                   </div>
                 </div>
@@ -909,11 +969,11 @@ function RoomInfoPanel({ room, name, onClose, authToken, onUpdateRoom }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const iconInputRef = useRef(null);
   const BASE = "http://192.168.100.127:8080";
-  const ROOM_EMOJIS = ["🌟","🎮","💖","📚","🏫","⚽","🎵","🎨","💻","⛩️","✈️","🍜","🔥","🌈","🚀","💎","🎯","🏆","👾","🤖","🐉","🌙","⚡","🎭","🎪","🛸","🌺","🎸","🏴‍☠️","🌊"];
+  const ROOM_EMOJIS = ["🌟", "🎮", "💖", "📚", "🏫", "⚽", "🎵", "🎨", "💻", "⛩️", "✈️", "🍜", "🔥", "🌈", "🚀", "💎", "🎯", "🏆", "👾", "🤖", "🐉", "🌙", "⚡", "🎭", "🎪", "🛸", "🌺", "🎸", "🏴‍☠️", "🌊"];
   const save = async () => { setSaving(true); setMsg(null); try { const res = await fetch(`${BASE}/rooms/${room.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ name: roomName.trim(), description: roomDesc.trim() }) }); if (!res.ok) { setMsg({ ok: false, text: "Failed to save" }); setSaving(false); return; } const updated = await res.json(); onUpdateRoom(updated); setMsg({ ok: true, text: "Saved!" }); setEditing(false); } catch { setMsg({ ok: false, text: "Server error" }); } setSaving(false); };
   const uploadIcon = async (file) => { const fd = new FormData(); fd.append("file", file); try { const res = await fetch(`${BASE}/rooms/${room.id}/icon`, { method: "POST", headers: { Authorization: `Bearer ${authToken}` }, body: fd }); const data = await res.json(); onUpdateRoom({ ...room, iconUrl: data.iconUrl }); setMsg({ ok: true, text: "Icon updated!" }); } catch { setMsg({ ok: false, text: "Upload failed" }); } };
   const setEmoji = async (emoji) => { try { const res = await fetch(`${BASE}/rooms/${room.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ name: room.name, description: room.description, emoji }) }); const updated = await res.json(); onUpdateRoom(updated); setShowEmojiPicker(false); setMsg({ ok: true, text: "Emoji updated!" }); } catch { setMsg({ ok: false, text: "Server error" }); } };
-  const gradients = ["#7c3aed","#06b6d4","#ec4899","#059669","#f59e0b"];
+  const gradients = ["#7c3aed", "#06b6d4", "#ec4899", "#059669", "#f59e0b"];
   const g = gradients[(room?.name || "").charCodeAt(0) % gradients.length];
   return (
     <div style={{ width: 280, borderLeft: "1px solid var(--divider)", height: "100%", background: "var(--glass2)", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden", animation: "slideInRight 0.2s cubic-bezier(0.16,1,0.3,1)" }}>
@@ -931,17 +991,17 @@ function RoomInfoPanel({ room, name, onClose, authToken, onUpdateRoom }) {
 }
 
 const THEMES = {
-  galaxy:    { accent:"#c46dff", accent2:"#7b8cff", accentGlow:"rgba(196,109,255,0.30)", accentSoft:"rgba(196,109,255,0.13)", bubbleMe:"linear-gradient(135deg,#c46dff 0%,#7b8cff 100%)", glass:"rgba(10,7,22,0.66)", glass2:"rgba(15,10,32,0.78)", glassBorder:"rgba(255,255,255,0.09)", divider:"rgba(255,255,255,0.07)", text:"#ede8ff", textSub:"#9080b8", textMuted:"#4e4268", bubbleOther:"rgba(28,18,52,0.88)", bubbleOb:"rgba(255,255,255,0.08)", inputBg:"rgba(18,12,38,0.72)", scrollbar:"rgba(196,109,255,0.22)", hover:"rgba(255,255,255,0.05)", btnBg:"rgba(255,255,255,0.07)", onlineBorder:"#0f0a20", storyBg:"#0b0810" },
-  mars:      { accent:"#ff6b35", accent2:"#ff9f6b", accentGlow:"rgba(255,107,53,0.30)", accentSoft:"rgba(255,107,53,0.13)", bubbleMe:"linear-gradient(135deg,#ff6b35 0%,#c0392b 100%)", glass:"rgba(22,8,4,0.70)", glass2:"rgba(32,12,6,0.82)", glassBorder:"rgba(255,120,80,0.12)", divider:"rgba(255,100,60,0.10)", text:"#ffe8e0", textSub:"#c08070", textMuted:"#7a4030", bubbleOther:"rgba(40,16,8,0.90)", bubbleOb:"rgba(255,120,80,0.10)", inputBg:"rgba(30,10,5,0.75)", scrollbar:"rgba(255,107,53,0.22)", hover:"rgba(255,107,53,0.07)", btnBg:"rgba(255,107,53,0.10)", onlineBorder:"#1a0803", storyBg:"#1a0803" },
-  neptune:   { accent:"#4fc3f7", accent2:"#81d4fa", accentGlow:"rgba(79,195,247,0.30)", accentSoft:"rgba(79,195,247,0.13)", bubbleMe:"linear-gradient(135deg,#0077b6 0%,#4fc3f7 100%)", glass:"rgba(0,15,30,0.70)", glass2:"rgba(0,20,40,0.82)", glassBorder:"rgba(79,195,247,0.12)", divider:"rgba(79,195,247,0.08)", text:"#e0f4ff", textSub:"#6aafc8", textMuted:"#2a5a70", bubbleOther:"rgba(0,25,50,0.90)", bubbleOb:"rgba(79,195,247,0.10)", inputBg:"rgba(0,15,32,0.75)", scrollbar:"rgba(79,195,247,0.22)", hover:"rgba(79,195,247,0.06)", btnBg:"rgba(79,195,247,0.09)", onlineBorder:"#000f1e", storyBg:"#000f1e" },
-  venus:     { accent:"#f9a825", accent2:"#ffd54f", accentGlow:"rgba(249,168,37,0.30)", accentSoft:"rgba(249,168,37,0.13)", bubbleMe:"linear-gradient(135deg,#f9a825 0%,#ff7043 100%)", glass:"rgba(255,248,225,0.70)", glass2:"rgba(255,252,235,0.88)", glassBorder:"rgba(200,140,0,0.25)", divider:"rgba(0,0,0,0.08)", text:"#3e2000", textSub:"#7a5010", textMuted:"#b8900a", bubbleOther:"rgba(255,255,255,0.95)", bubbleOb:"rgba(200,140,0,0.20)", inputBg:"rgba(255,255,255,0.75)", scrollbar:"rgba(249,168,37,0.30)", hover:"rgba(249,168,37,0.08)", btnBg:"rgba(249,168,37,0.10)", onlineBorder:"#fff8e1", storyBg:"#fff8e1" },
-  blackhole: { accent:"#a78bfa", accent2:"#7c3aed", accentGlow:"rgba(167,139,250,0.25)", accentSoft:"rgba(167,139,250,0.10)", bubbleMe:"linear-gradient(135deg,#1a0050 0%,#7c3aed 100%)", glass:"rgba(2,0,8,0.85)", glass2:"rgba(4,0,14,0.92)", glassBorder:"rgba(167,139,250,0.07)", divider:"rgba(255,255,255,0.04)", text:"#e8e0ff", textSub:"#6050a0", textMuted:"#2e2050", bubbleOther:"rgba(6,0,20,0.95)", bubbleOb:"rgba(167,139,250,0.07)", inputBg:"rgba(4,0,12,0.80)", scrollbar:"rgba(167,139,250,0.18)", hover:"rgba(167,139,250,0.04)", btnBg:"rgba(167,139,250,0.06)", onlineBorder:"#020008", storyBg:"#020008" },
-  nebula:    { accent:"#f472b6", accent2:"#a78bfa", accentGlow:"rgba(244,114,182,0.28)", accentSoft:"rgba(244,114,182,0.12)", bubbleMe:"linear-gradient(135deg,#f472b6 0%,#a78bfa 100%)", glass:"rgba(15,5,25,0.68)", glass2:"rgba(20,8,35,0.80)", glassBorder:"rgba(244,114,182,0.10)", divider:"rgba(244,114,182,0.07)", text:"#ffe8f8", textSub:"#b070a0", textMuted:"#604058", bubbleOther:"rgba(25,10,40,0.88)", bubbleOb:"rgba(244,114,182,0.09)", inputBg:"rgba(15,5,28,0.72)", scrollbar:"rgba(244,114,182,0.20)", hover:"rgba(244,114,182,0.06)", btnBg:"rgba(244,114,182,0.08)", onlineBorder:"#0f0519", storyBg:"#0f0519" },
+  galaxy: { accent: "#c46dff", accent2: "#7b8cff", accentGlow: "rgba(196,109,255,0.30)", accentSoft: "rgba(196,109,255,0.13)", bubbleMe: "linear-gradient(135deg,#c46dff 0%,#7b8cff 100%)", glass: "rgba(10,7,22,0.66)", glass2: "rgba(15,10,32,0.78)", glassBorder: "rgba(255,255,255,0.09)", divider: "rgba(255,255,255,0.07)", text: "#ede8ff", textSub: "#9080b8", textMuted: "#4e4268", bubbleOther: "rgba(28,18,52,0.88)", bubbleOb: "rgba(255,255,255,0.08)", inputBg: "rgba(18,12,38,0.72)", scrollbar: "rgba(196,109,255,0.22)", hover: "rgba(255,255,255,0.05)", btnBg: "rgba(255,255,255,0.07)", onlineBorder: "#0f0a20", storyBg: "#0b0810" },
+  mars: { accent: "#ff6b35", accent2: "#ff9f6b", accentGlow: "rgba(255,107,53,0.30)", accentSoft: "rgba(255,107,53,0.13)", bubbleMe: "linear-gradient(135deg,#ff6b35 0%,#c0392b 100%)", glass: "rgba(22,8,4,0.70)", glass2: "rgba(32,12,6,0.82)", glassBorder: "rgba(255,120,80,0.12)", divider: "rgba(255,100,60,0.10)", text: "#ffe8e0", textSub: "#c08070", textMuted: "#7a4030", bubbleOther: "rgba(40,16,8,0.90)", bubbleOb: "rgba(255,120,80,0.10)", inputBg: "rgba(30,10,5,0.75)", scrollbar: "rgba(255,107,53,0.22)", hover: "rgba(255,107,53,0.07)", btnBg: "rgba(255,107,53,0.10)", onlineBorder: "#1a0803", storyBg: "#1a0803" },
+  neptune: { accent: "#4fc3f7", accent2: "#81d4fa", accentGlow: "rgba(79,195,247,0.30)", accentSoft: "rgba(79,195,247,0.13)", bubbleMe: "linear-gradient(135deg,#0077b6 0%,#4fc3f7 100%)", glass: "rgba(0,15,30,0.70)", glass2: "rgba(0,20,40,0.82)", glassBorder: "rgba(79,195,247,0.12)", divider: "rgba(79,195,247,0.08)", text: "#e0f4ff", textSub: "#6aafc8", textMuted: "#2a5a70", bubbleOther: "rgba(0,25,50,0.90)", bubbleOb: "rgba(79,195,247,0.10)", inputBg: "rgba(0,15,32,0.75)", scrollbar: "rgba(79,195,247,0.22)", hover: "rgba(79,195,247,0.06)", btnBg: "rgba(79,195,247,0.09)", onlineBorder: "#000f1e", storyBg: "#000f1e" },
+  venus: { accent: "#f9a825", accent2: "#ffd54f", accentGlow: "rgba(249,168,37,0.30)", accentSoft: "rgba(249,168,37,0.13)", bubbleMe: "linear-gradient(135deg,#f9a825 0%,#ff7043 100%)", glass: "rgba(255,248,225,0.70)", glass2: "rgba(255,252,235,0.88)", glassBorder: "rgba(200,140,0,0.25)", divider: "rgba(0,0,0,0.08)", text: "#3e2000", textSub: "#7a5010", textMuted: "#b8900a", bubbleOther: "rgba(255,255,255,0.95)", bubbleOb: "rgba(200,140,0,0.20)", inputBg: "rgba(255,255,255,0.75)", scrollbar: "rgba(249,168,37,0.30)", hover: "rgba(249,168,37,0.08)", btnBg: "rgba(249,168,37,0.10)", onlineBorder: "#fff8e1", storyBg: "#fff8e1" },
+  blackhole: { accent: "#a78bfa", accent2: "#7c3aed", accentGlow: "rgba(167,139,250,0.25)", accentSoft: "rgba(167,139,250,0.10)", bubbleMe: "linear-gradient(135deg,#1a0050 0%,#7c3aed 100%)", glass: "rgba(2,0,8,0.85)", glass2: "rgba(4,0,14,0.92)", glassBorder: "rgba(167,139,250,0.07)", divider: "rgba(255,255,255,0.04)", text: "#e8e0ff", textSub: "#6050a0", textMuted: "#2e2050", bubbleOther: "rgba(6,0,20,0.95)", bubbleOb: "rgba(167,139,250,0.07)", inputBg: "rgba(4,0,12,0.80)", scrollbar: "rgba(167,139,250,0.18)", hover: "rgba(167,139,250,0.04)", btnBg: "rgba(167,139,250,0.06)", onlineBorder: "#020008", storyBg: "#020008" },
+  nebula: { accent: "#f472b6", accent2: "#a78bfa", accentGlow: "rgba(244,114,182,0.28)", accentSoft: "rgba(244,114,182,0.12)", bubbleMe: "linear-gradient(135deg,#f472b6 0%,#a78bfa 100%)", glass: "rgba(15,5,25,0.68)", glass2: "rgba(20,8,35,0.80)", glassBorder: "rgba(244,114,182,0.10)", divider: "rgba(244,114,182,0.07)", text: "#ffe8f8", textSub: "#b070a0", textMuted: "#604058", bubbleOther: "rgba(25,10,40,0.88)", bubbleOb: "rgba(244,114,182,0.09)", inputBg: "rgba(15,5,28,0.72)", scrollbar: "rgba(244,114,182,0.20)", hover: "rgba(244,114,182,0.06)", btnBg: "rgba(244,114,182,0.08)", onlineBorder: "#0f0519", storyBg: "#0f0519" },
 };
 
 const buildCSS = (theme) => {
   const t = THEMES[theme] || THEMES.galaxy;
-  const dark = ["galaxy","mars","blackhole","nebula","neptune"].includes(theme);
+  const dark = ["galaxy", "mars", "blackhole", "nebula", "neptune"].includes(theme);
   return `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
@@ -956,10 +1016,11 @@ const buildCSS = (theme) => {
     --input-bg:${t.inputBg}; --scrollbar:${t.scrollbar};
     --hover:${t.hover}; --btn-bg:${t.btnBg};
   }
-`;};
+`;
+};
 const buildCSSBody = (theme) => {
   const t = THEMES[theme] || THEMES.galaxy;
-  const dark = ["galaxy","mars","blackhole","nebula","neptune"].includes(theme);
+  const dark = ["galaxy", "mars", "blackhole", "nebula", "neptune"].includes(theme);
   return `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
@@ -1124,7 +1185,8 @@ const buildCSSBody = (theme) => {
   .sb-user:hover { background:var(--hover); }
   .sb-user-av { width:36px; height:36px; border-radius:50%; background:var(--bubble-me); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:#fff; overflow:hidden; }
   .sb-user-name { font-size:14px; font-weight:700; color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-`;}
+`;
+}
 
 const getTime = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const initial = (n) => (n || "?")[0].toUpperCase();
@@ -1136,14 +1198,14 @@ const initial = (n) => (n || "?")[0].toUpperCase();
 ───────────────────────────────────────────────────────── */
 export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "galaxy");
-  const [dark, setDark] = React.useState(["galaxy","mars","blackhole","nebula"].includes(theme));
-  React.useEffect(() => { setDark(["galaxy","mars","blackhole","nebula"].includes(theme)); }, [theme]);
+  const [dark, setDark] = React.useState(["galaxy", "mars", "blackhole", "nebula"].includes(theme));
+  React.useEffect(() => { setDark(["galaxy", "mars", "blackhole", "nebula"].includes(theme)); }, [theme]);
   const [chatTheme, setChatTheme] = useState(() => localStorage.getItem("chatTheme") || "default");
   const [name] = useState(authUser || "");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [deletingIds, setDeletingIds] = useState(new Set());
-  const [flashIds,    setFlashIds]    = useState(new Set());
+  const [flashIds, setFlashIds] = useState(new Set());
   const [view, setView] = useState(() => sessionStorage.getItem("view") || "channel");
   const [activeDmUser, setActiveDmUser] = useState(() => sessionStorage.getItem("activeDmUser") || null);
   const [dmMessages, setDmMessages] = useState({});
@@ -1153,6 +1215,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const [rooms, setRooms] = useState([]);
   const [roomMessages, setRoomMessages] = useState({});
   const [showCreateRoom, setShowCreateRoom] = useState(false);
+  const [createRoomError, setCreateRoomError] = useState(null);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [myProfile, setMyProfile] = useState(null);
@@ -1189,6 +1252,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const [typingUsers, setTypingUsers] = useState([]);
   const typingTimeout = useRef(null);
   const [dragOver, setDragOver] = useState(false);
+  const [toasts, setToasts] = useState([]);
   const dragCounter = useRef(0);
   const [showEmoji, setShowEmoji] = useState(false);
   const [searchQ, setSearchQ] = useState("");
@@ -1206,6 +1270,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const videoInputRef = useRef(null);
   const recordTimer = useRef(null);
   const recorderRef = useRef(null);
+  const sendVoiceOnStopRef = useRef(false); // true only when Send button triggers stop
   const nameRef = useRef(name);
   const videoRefs = useRef({});
   const roomSubRef = useRef({});
@@ -1231,9 +1296,9 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
           return r.json();
         });
 
-      authedFetch(`http://192.168.100.127:8080/auth/users`).then(setAllUsers).catch(() => {});
-      authedFetch(`http://192.168.100.127:8080/auth/profile/${authUser}`).then(setMyProfile).catch(() => {});
-      authedFetch(`http://192.168.100.127:8080/rooms`).then(setRooms).catch(() => {});
+      authedFetch(`http://192.168.100.127:8080/auth/users`).then(setAllUsers).catch(() => { });
+      authedFetch(`http://192.168.100.127:8080/auth/profile/${authUser}`).then(setMyProfile).catch(() => { });
+      authedFetch(`http://192.168.100.127:8080/rooms`).then(setRooms).catch(() => { });
     }
   }, []); // eslint-disable-line
 
@@ -1295,13 +1360,35 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
         client.subscribe(`/topic/dm.edit.${name}`, (res) => { const dm = JSON.parse(res.body); const other = dm.sender === name ? dm.recipient : dm.sender; setDmMessages(prev => ({ ...prev, [other]: (prev[other] || []).map(m => m.id === dm.id ? { ...m, content: dm.content, edited: true } : m) })); });
         client.subscribe(`/topic/dm.delete.${name}`, (res) => { const dm = JSON.parse(res.body); const other = dm.sender === name ? dm.recipient : dm.sender; setDmMessages(prev => ({ ...prev, [other]: (prev[other] || []).map(m => m.id === dm.id ? { ...m, content: 'This message was deleted.', deleted: true } : m) })); });
         client.subscribe("/topic/channel.notify", (res) => { setView(currentView => { if (currentView !== "channel") { setChannelUnread(prev => prev + 1); } return currentView; }); });
-        client.subscribe("/topic/room.notify", (res) => { const event = JSON.parse(res.body); if (event.sender === name) return; setActiveRoom(currentRoom => { if (!currentRoom || currentRoom.id !== event.roomId) { setRoomUnread(prev => ({ ...prev, [event.roomId]: (prev[event.roomId] || 0) + 1 })); } return currentRoom; }); });
-        client.subscribe("/topic/call-presence", (res) => { const event = JSON.parse(res.body); if (event.type === "JOIN") { setCallPresence(prev => ({ ...prev, [event.callRoom]: [...(prev[event.callRoom] || []).filter(u => u !== event.sender), event.sender] })); } else if (event.type === "LEAVE") { setCallPresence(prev => ({ ...prev, [event.callRoom]: (prev[event.callRoom] || []).filter(u => u !== event.sender) })); } });
+        client.subscribe("/topic/room.notify", (res) => {
+          const event = JSON.parse(res.body);
+
+          // FIX: ignore own messages
+          if (event.sender === nameRef.current) return;
+
+          // FIX: only increment unread if user is NOT currently viewing that room
+          setView(currentView => {
+            setActiveRoom(currentRoom => {
+              const isViewingThisRoom =
+                currentView === "room" &&
+                currentRoom?.id === event.roomId;
+
+              if (!isViewingThisRoom) {
+                setRoomUnread(prev => ({
+                  ...prev,
+                  [event.roomId]: (prev[event.roomId] || 0) + 1
+                }));
+              }
+              return currentRoom;
+            });
+            return currentView;
+          });
+        }); client.subscribe("/topic/call-presence", (res) => { const event = JSON.parse(res.body); if (event.type === "JOIN") { setCallPresence(prev => ({ ...prev, [event.callRoom]: [...(prev[event.callRoom] || []).filter(u => u !== event.sender), event.sender] })); } else if (event.type === "LEAVE") { setCallPresence(prev => ({ ...prev, [event.callRoom]: (prev[event.callRoom] || []).filter(u => u !== event.sender) })); } });
         client.subscribe("/topic/reaction", (res) => { const event = JSON.parse(res.body); setReactions(prev => ({ ...prev, [event.messageId]: event.reactions || [] })); });
         client.subscribe("/topic/edit", (res) => { const event = JSON.parse(res.body); setMessages(prev => prev.map(m => m.id === event.messageId ? { ...m, content: event.newContent, edited: true, editCount: event.editCount || 1 } : m)); });
         client.subscribe("/topic/delete", (res) => { const event = JSON.parse(res.body); setMessages(prev => prev.map(m => m.id === event.messageId ? { ...m, content: "This message was deleted.", deleted: true } : m)); });
 
-        
+
       },
       onStompError: (f) => {
         const msg = f.headers["message"] || "";
@@ -1324,6 +1411,14 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
     stompClient.current = client;
   };
 
+  const showToast = (message, type = "error") => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
   const sendMessage = () => {
     if (editingMsg) { if (stompClient.current?.connected && editText.trim()) { stompClient.current.publish({ destination: "/app/edit", body: JSON.stringify({ messageId: editingMsg.id, newContent: editText.trim(), editor: name }) }); } setEditingMsg(null); setEditText(""); setMessage(""); return; }
     clearTimeout(typingTimeout.current);
@@ -1335,16 +1430,59 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
     setMessage("");
   };
 
-  const openDm = (user) => { setActiveDmUser(user); setView("dm"); setTypingUsers([]); sessionStorage.setItem("view", "dm"); sessionStorage.setItem("activeDmUser", user); setDmUnread(prev => ({ ...prev, [user]: 0 })); setMessage(""); fetch(`http://192.168.100.127:8080/dm/history?userA=${name}&userB=${user}`, { headers: { Authorization: `Bearer ${authToken}` } }).then(r => r.json()).then(data => setDmMessages(prev => ({ ...prev, [user]: data.map(m => ({ ...m, time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : getTime() })) }))).catch(() => {}); };
+  const openDm = (user) => { setActiveDmUser(user); setView("dm"); setTypingUsers([]); sessionStorage.setItem("view", "dm"); sessionStorage.setItem("activeDmUser", user); setDmUnread(prev => ({ ...prev, [user]: 0 })); setMessage(""); fetch(`http://192.168.100.127:8080/dm/history?userA=${name}&userB=${user}`, { headers: { Authorization: `Bearer ${authToken}` } }).then(r => r.json()).then(data => setDmMessages(prev => ({ ...prev, [user]: data.map(m => ({ ...m, time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : getTime() })) }))).catch(() => { }); };
   const openRoom = (room) => {
     setActiveRoom(room); setView("room"); setMessage(""); setShowRoomInfo(false); setTypingUsers([]); setTypingUsers([]);
     sessionStorage.setItem("view", "room"); sessionStorage.setItem("activeRoom", JSON.stringify(room));
     setRoomUnread(prev => ({ ...prev, [room.id]: 0 }));
     if (stompClient.current?.connected && !roomSubRef.current[room.id]) { roomSubRef.current[room.id] = stompClient.current.subscribe(`/topic/room.${room.id}`, (res) => { const msg = JSON.parse(res.body); setRoomMessages(prev => { const existing = prev[room.id] || []; if (existing.some(m => m.id === msg.id && msg.id)) return prev; return { ...prev, [room.id]: [...existing, { ...msg, time: getTime() }] }; }); }); }
-    fetch(`http://192.168.100.127:8080/rooms/${room.id}/history`, { headers: { Authorization: `Bearer ${authToken}` } }).then(r => r.json()).then(data => setRoomMessages(prev => ({ ...prev, [room.id]: data.map(m => ({ ...m, time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : getTime() })) }))).catch(() => {});
+    fetch(`http://192.168.100.127:8080/rooms/${room.id}/history`, { headers: { Authorization: `Bearer ${authToken}` } }).then(r => r.json()).then(data => setRoomMessages(prev => ({ ...prev, [room.id]: data.map(m => ({ ...m, time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : getTime() })) }))).catch(() => { });
   };
 
-  const createRoom = async (roomData) => { const roomName = typeof roomData === "object" ? roomData.name : roomData; const desc = typeof roomData === "object" ? (roomData.template || "") : ""; const emoji = typeof roomData === "object" ? (roomData.emoji || "🌟") : "🌟"; const roomType = typeof roomData === "object" ? (roomData.type || "public") : "public"; try { const res = await fetch(`http://192.168.100.127:8080/rooms`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ name: roomName, description: desc, emoji, roomType, createdBy: name }) }); const room = await res.json(); if (room.id) { setRooms(prev => [...prev, room]); setShowCreateRoom(false); openRoom(room); } } catch { } };
+  const createRoom = async (roomData) => {
+    const roomName = typeof roomData === "object" ? roomData.name : roomData;
+    const desc = typeof roomData === "object" ? (roomData.description || roomData.template || "") : "";
+    const emoji = typeof roomData === "object" ? (roomData.emoji || "🌟") : "🌟";
+    const type = typeof roomData === "object" ? (roomData.type || "public") : "public";
+
+    // Guard: don't submit if name is empty
+    if (!roomName?.trim()) return;
+
+    try {
+      const res = await fetch(`http://192.168.100.127:8080/rooms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        // FIX: backend expects "type" not "roomType", and "description" not template
+        body: JSON.stringify({
+          name: roomName.trim(),
+          description: desc,
+          emoji,
+          type,          // ← was "roomType" — backend reads "type"
+          createdBy: name,
+        })
+      });
+
+      if (res.status === 409) {
+        setCreateRoomError("A room with that name already exists. Please choose a different name.");
+        return;
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setCreateRoomError("Failed to create room: " + (err.error || res.status));
+        return;
+      }
+
+      if (room.id) {
+        setRooms(prev => [...prev, room]);
+        setShowCreateRoom(false);
+        setCreateRoomError(null);
+        openRoom(room);
+      }
+    } catch (err) {
+      console.error("createRoom error", err);
+      showToast("Could not connect to server. Is Spring Boot running?");
+    }
+  };
 
   const sendReaction = (messageId, emoji) => { if (!stompClient.current?.connected) return; stompClient.current.publish({ destination: "/app/react", body: JSON.stringify({ messageId, username: name, emoji }) }); };
   const startEdit = (msg) => { setEditingMsg(msg); setEditText(msg.content); setMessage(msg.content); setTimeout(() => inputRef.current?.focus(), 50); };
@@ -1356,7 +1494,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const BASE_URL = "http://192.168.100.127:8080";
   const uploadFile = async (file, type) => {
     if (!stompClient.current?.connected) {
-      alert("Not connected to server. Please wait and try again.");
+      showToast("Not connected to server. Please wait and try again.", "error");
       return;
     }
     try {
@@ -1370,7 +1508,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
       if (view === "dm" && activeDmUser) { stompClient.current.publish({ destination: "/app/dm.send", body: JSON.stringify({ ...payload, recipient: activeDmUser }) }); }
       else if (view === "room" && activeRoom) { stompClient.current.publish({ destination: "/app/room.send", body: JSON.stringify({ ...payload, roomId: activeRoom.id }) }); }
       else { stompClient.current.publish({ destination: "/app/send", body: JSON.stringify(payload) }); }
-    } catch (err) { alert("Upload failed — is the server running?\n" + err.message); }
+    } catch (err) { showToast("Upload failed: " + err.message, "error"); }
   };
 
   const handleImageChange = (e) => { const f = e.target.files[0]; if (f) uploadFile(f, "IMAGE"); e.target.value = ""; };
@@ -1385,11 +1523,26 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
       recorderRef.current = recorder;
       const chunks = [];
       recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) { chunks.push(e.data); } };
-      recorder.onstop = () => { stream.getTracks().forEach((track) => track.stop()); if (recordTimer.current) { clearInterval(recordTimer.current); } setRecording(false); setRecordSecs(0); const blob = new Blob(chunks, { type: "audio/webm" }); if (blob.size > 0) { const file = new File([blob], "voice.webm", { type: "audio/webm" }); uploadFile(file, "AUDIO"); } };
-      recorder.start(); setRecording(true);
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        if (recordTimer.current) { clearInterval(recordTimer.current); }
+        setRecording(false);
+        setRecordSecs(0);
+
+        // FIX: only upload if Send button was explicitly clicked
+        // Stopping the mic (browser button or 60s limit) should NOT auto-send
+        if (!sendVoiceOnStopRef.current) return;
+        sendVoiceOnStopRef.current = false;
+
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        if (blob.size > 0) {
+          const file = new File([blob], "voice.webm", { type: "audio/webm" });
+          uploadFile(file, "AUDIO");
+        }
+      }; recorder.start(); setRecording(true);
       let seconds = 0;
       recordTimer.current = setInterval(() => { seconds++; setRecordSecs(seconds); if (seconds >= 60 && recorder.state !== "inactive") { recorder.stop(); } }, 1000);
-    } catch (error) { console.error("Microphone error:", error); alert("Microphone access denied or unavailable."); }
+    } catch (error) { console.error("Microphone error:", error); showToast("Microphone access denied or unavailable."); }
   };
 
   const stopRecording = () => { const recorder = recorderRef.current; if (recorder && recorder.state !== "inactive") { recorder.stop(); } };
@@ -1418,7 +1571,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const handleDrop = (e) => { e.preventDefault(); dragCounter.current = 0; setDragOver(false); const file = e.dataTransfer.files[0]; if (!file) return; if (file.type.startsWith("image/")) uploadFile(file, "IMAGE"); else if (file.type.startsWith("video/")) uploadFile(file, "VIDEO"); else if (file.type.startsWith("audio/")) uploadFile(file, "AUDIO"); else uploadFile(file, "FILE"); };
 
   const renderContent = (msg) => {
-     if (msg.type === "POLL" && msg.pollData) {
+    if (msg.type === "POLL" && msg.pollData) {
       const poll = msg.pollData;
       const totalVotes = poll.totalVotes || 0;
       return (<div style={{ background: "var(--glass2)", border: "1px solid var(--glass-border)", borderRadius: 14, padding: "14px 16px", minWidth: 260, maxWidth: 340 }}>
@@ -1429,8 +1582,16 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
     }
     if (msg.deleted) return <span style={{ opacity: 0.6, fontStyle: "italic", fontSize: 13 }}>🚫 This message was deleted</span>;
     if (msg.type === "CALL") return (<div style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.85 }}><IcoPhone color={msg.sender === name ? "#fff" : "var(--accent)"} size={14} /><span style={{ fontSize: 13 }}>{msg.content}</span></div>);
-    const resolveUrl = (url) => { if (!url) return ""; if (url.startsWith("http")) { const path = url.replace(/^https?:\/\/[^/]+/, ""); return `http://192.168.100.127:8080${path}`; } return `http://192.168.100.127:8080${url.startsWith("/") ? "" : "/"}${url}`; };
-    if (msg.type === "IMAGE") return (<img src={resolveUrl(msg.fileUrl)} alt="img" className="msg-img" onError={(e) => { e.target.style.border = "2px solid red"; e.target.alt = "Failed: " + resolveUrl(msg.fileUrl); }} />);
+    const resolveUrl = (url) => {
+      if (!url) return "";
+      // Already a full URL pointing to our backend — use as-is
+      if (url.startsWith("http://192.168.100.127:8080") ||
+        url.startsWith("http://localhost:8080")) return url;
+      // Full URL to a different host (external image) — use as-is
+      if (url.startsWith("http://") || url.startsWith("https://")) return url;
+      // Relative path — prefix with backend base
+      return `http://192.168.100.127:8080${url.startsWith("/") ? "" : "/"}${url}`;
+    }; if (msg.type === "IMAGE") return (<img src={resolveUrl(msg.fileUrl)} alt="img" className="msg-img" onError={(e) => { e.target.style.border = "2px solid red"; e.target.alt = "Failed: " + resolveUrl(msg.fileUrl); }} />);
     if (msg.type === "FILE") return (<a href={resolveUrl(msg.fileUrl)} target="_blank" rel="noreferrer" className="msg-file"><span className="msg-file-ic"><IcoFile color="#fff" size={18} /></span><span>{msg.content || "Download File"}</span></a>);
     if (msg.type === "AUDIO") return (<audio controls src={resolveUrl(msg.fileUrl)} className="msg-audio" />);
     if (msg.type === "VIDEO") { const msgKey = msg.id || msg.fileUrl; return (<div style={{ position: "relative", display: "inline-block" }}><video ref={el => { if (el) videoRefs.current[msgKey] = el; }} src={resolveUrl(msg.fileUrl)} controls preload="metadata" style={{ maxWidth: 280, maxHeight: 200, borderRadius: 14, display: "block", boxShadow: "0 5px 22px rgba(0,0,0,0.28)" }} /><button onClick={() => videoRefs.current[msgKey]?.requestFullscreen()} style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.55)", border: "none", borderRadius: 6, color: "#fff", fontSize: 13, padding: "3px 7px", cursor: "pointer", lineHeight: 1 }} title="Fullscreen">⛶</button></div>); }
@@ -1451,13 +1612,13 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   useEffect(() => {
     const root = document.documentElement.style;
     const fontSizeMap = { small: "12px", medium: "14.5px", large: "17px" };
-    const paddingMap  = { small: "8px 12px", medium: "11px 15px", large: "13px 18px" };
+    const paddingMap = { small: "8px 12px", medium: "11px 15px", large: "13px 18px" };
     const scale = { small: 0.85, medium: 1, large: 1.18 }[fontSize] || 1;
     root.setProperty("--bubble-font-size", fontSizeMap[fontSize] || fontSizeMap.medium);
-    root.setProperty("--bubble-padding",   compactMode ? "5px 10px" : (paddingMap[fontSize] || paddingMap.medium));
-    root.setProperty("--bubble-radius",    "22px");
+    root.setProperty("--bubble-padding", compactMode ? "5px 10px" : (paddingMap[fontSize] || paddingMap.medium));
+    root.setProperty("--bubble-radius", "22px");
     root.setProperty("--bubble-tail-radius", "5px");
-    root.setProperty("--chat-font-scale",  String(scale));
+    root.setProperty("--chat-font-scale", String(scale));
   }, [fontSize, compactMode]);
 
   const currentMessages = view === "dm" && activeDmUser ? (dmMessages[activeDmUser] || []) : view === "room" && activeRoom ? (roomMessages[activeRoom.id] || []) : messages;
@@ -1475,19 +1636,53 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const searchNext = () => { if (!msgSearchResults.length) return; const next = msgSearchIdx <= 0 ? msgSearchResults.length - 1 : msgSearchIdx - 1; setMsgSearchIdx(next); scrollToMsg(msgSearchResults[next]); };
   const searchPrev = () => { if (!msgSearchResults.length) return; const prev = msgSearchIdx >= msgSearchResults.length - 1 ? 0 : msgSearchIdx + 1; setMsgSearchIdx(prev); scrollToMsg(msgSearchResults[prev]); };
 
-  useEffect(() => { if (!messages.length || !stompClient.current?.connected) return; messages.forEach(msg => { if (msg.sender !== name && msg.id && msg.status !== "SEEN") { stompClient.current.publish({ destination: "/app/seen", body: JSON.stringify({ messageId: msg.id, username: name }) }); } }); }, [messages]); // eslint-disable-line
+  // Track which message IDs we've already marked seen — persists across renders
+  const seenIdsRef = useRef(new Set());
 
-  useEffect(() => { const handler = (e) => { if (emojiRef.current && !emojiRef.current.contains(e.target)) { setShowEmoji(false); } setShowProfilePopup(false); setShowStatusMenu(false); }; document.addEventListener("mousedown", handler); return () => document.removeEventListener("mousedown", handler); }, []);
+  useEffect(() => {
+    // Only mark seen when user is actively viewing channel (not DM or room)
+    if (view !== "channel") return;
+    if (!messages.length || !stompClient.current?.connected) return;
+
+    messages.forEach(msg => {
+      // Skip: own messages, no ID, already seen, already reported
+      if (msg.sender === name) return;
+      if (!msg.id) return;
+      if (msg.status === "SEEN") return;
+      if (seenIdsRef.current.has(msg.id)) return;
+
+      seenIdsRef.current.add(msg.id);
+      stompClient.current.publish({
+        destination: "/app/seen",
+        body: JSON.stringify({ messageId: msg.id, username: name })
+      });
+    });
+  }, [messages, view]); // eslint-disable-line
+  const profilePopupRef = useRef(null);
+  useEffect(() => {
+    const handler = (e) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target)) {
+        setShowEmoji(false);
+      }
+      // Only close profile popup if click is outside it
+      if (profilePopupRef.current && !profilePopupRef.current.contains(e.target)) {
+        setShowProfilePopup(false);
+        setShowStatusMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
-      if (editingMsg)     { setEditingMsg(null); setEditText(""); setMessage(""); return; }
-      if (showSettings)   { setShowSettings(false); return; }
-      if (showProfile)    { setShowProfile(false); return; }
+      if (editingMsg) { setEditingMsg(null); setEditText(""); setMessage(""); return; }
+      if (showSettings) { setShowSettings(false); return; }
+      if (showProfile) { setShowProfile(false); return; }
       if (showCreateRoom) { setShowCreateRoom(false); return; }
-      if (showMsgSearch)  { setShowMsgSearch(false); setMsgSearchQ(""); setMsgSearchResults([]); return; }
-      if (showEmoji)      { setShowEmoji(false); return; }
+      if (showMsgSearch) { setShowMsgSearch(false); setMsgSearchQ(""); setMsgSearchResults([]); return; }
+      if (showEmoji) { setShowEmoji(false); return; }
       if (showMoodPicker) { setShowMoodPicker(false); return; }
     };
     window.addEventListener("keydown", onKey);
@@ -1499,12 +1694,12 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
     <>
       <style>{buildCSSBody(theme)}</style>
       <BackgroundCanvas dark={dark} />
-      
+
       <div className="page">
         <div className="chat-window">
           <div className="sidebar" style={{ flexDirection: "column", background: "var(--glass2)", borderRight: "1px solid var(--divider)", width: 240, minWidth: 240, maxWidth: 240, flexShrink: 0, overflow: "hidden", display: (window.innerWidth < 640 && view !== "channel" && view !== "friends") ? "none" : "flex" }}>
             <div style={{ padding: "0 10px", height: 48, borderBottom: "1px solid var(--divider)", flexShrink: 0, display: "flex", alignItems: "center", background: "var(--glass2)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: dark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.08)", borderRadius: 6, padding: "5px 10px", flex: 1, cursor: "text" }} onClick={() => {}}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: dark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.08)", borderRadius: 6, padding: "5px 10px", flex: 1, cursor: "text" }} onClick={() => { }}>
                 <IcoSearch color="var(--text-muted)" size={13} />
                 <input placeholder="Find or start a conversation" value={searchQ} onChange={e => setSearchQ(e.target.value)} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "inherit", fontSize: 13, color: "var(--text)", width: "100%" }} />
               </div>
@@ -1528,85 +1723,173 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
                 <button onClick={() => setShowCreateRoom(true)} style={{ background: "var(--accent-soft)", border: "1px solid var(--glass-border)", borderRadius: 6, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}><IcoPlus color="var(--accent)" size={11} /></button>
               </div>
               {rooms.map(room => (<div key={room.id} onClick={() => openRoom(room)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "room" && activeRoom?.id === room.id ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }} onMouseEnter={e => { if (!(view === "room" && activeRoom?.id === room.id)) e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }} onMouseLeave={e => { if (!(view === "room" && activeRoom?.id === room.id)) e.currentTarget.style.background = "transparent"; }}>
-              
-                <div style={{ width: 32, height: 32, borderRadius: 10, background: room.iconUrl ? "transparent" : `linear-gradient(135deg,${["#7c3aed","#06b6d4","#ec4899","#059669","#f59e0b"][room.id % 5]},${["#a855f7","#7c3aed","#a855f7","#06b6d4","#ec4899"][room.id % 5]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0, overflow: "hidden" }}>{room.iconUrl ? <img src={room.iconUrl.startsWith("http") ? room.iconUrl : `http://192.168.100.127:8080${room.iconUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 10 }} /> : (room.emoji || "🌟")}</div>
+
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: room.iconUrl ? "transparent" : `linear-gradient(135deg,${["#7c3aed", "#06b6d4", "#ec4899", "#059669", "#f59e0b"][room.id % 5]},${["#a855f7", "#7c3aed", "#a855f7", "#06b6d4", "#ec4899"][room.id % 5]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0, overflow: "hidden" }}>{room.iconUrl ? <img src={room.iconUrl.startsWith("http") ? room.iconUrl : `http://192.168.100.127:8080${room.iconUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 10 }} /> : (room.emoji || "🌟")}</div>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{room.name}</div><div style={{ fontSize: 11, color: "var(--text-sub)" }}>{room.description || "Room"}</div></div>
                 {roomUnread[room.id] > 0 && <div style={{ minWidth: 18, height: 18, borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{roomUnread[room.id]}</div>}
               </div>))}
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--accent)", opacity: 0.7, padding: "14px 10px 5px", display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 8, opacity: 0.6 }}>✦</span> Direct Messages</div>
-              {friends.filter(u => u !== name && (!searchQ || u.toLowerCase().includes(searchQ.toLowerCase()))).map((user, i) => { const gradients = ["linear-gradient(135deg,#7c3aed,#a855f7)","linear-gradient(135deg,#06b6d4,#7c3aed)","linear-gradient(135deg,#ec4899,#a855f7)","linear-gradient(135deg,#059669,#06b6d4)","linear-gradient(135deg,#f59e0b,#ec4899)"]; const grad = gradients[user.charCodeAt(0) % gradients.length]; return (<div key={i} onClick={() => openDm(user)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "dm" && activeDmUser === user ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }} onMouseEnter={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }} onMouseLeave={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "transparent"; }}>{view === "dm" && activeDmUser === user && <div style={{ position: "absolute", left: 0, top: "20%", height: "60%", width: 3, background: "var(--accent)", borderRadius: "0 3px 3px 0" }} />}<div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: grad, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{user[0].toUpperCase()}<div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: onlineUsers.includes(user) ? "#10b981" : "rgba(255,255,255,0.2)", border: "2px solid var(--glass2)", boxShadow: onlineUsers.includes(user) ? "0 0 5px #10b981" : "none" }} /></div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user}</div><div style={{ fontSize: 11, color: onlineUsers.includes(user) ? "#10b981" : "var(--text-sub)" }}>{onlineUsers.includes(user) ? "● Active" : "○ Offline"}</div></div>{dmUnread[user] > 0 && <div style={{ minWidth: 18, height: 18, borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{dmUnread[user]}</div>}</div>); })}
+              {friends.filter(u => u !== name && (!searchQ || u.toLowerCase().includes(searchQ.toLowerCase()))).map((user, i) => { const gradients = ["linear-gradient(135deg,#7c3aed,#a855f7)", "linear-gradient(135deg,#06b6d4,#7c3aed)", "linear-gradient(135deg,#ec4899,#a855f7)", "linear-gradient(135deg,#059669,#06b6d4)", "linear-gradient(135deg,#f59e0b,#ec4899)"]; const grad = gradients[user.charCodeAt(0) % gradients.length]; return (<div key={i} onClick={() => openDm(user)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "dm" && activeDmUser === user ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }} onMouseEnter={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }} onMouseLeave={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "transparent"; }}>{view === "dm" && activeDmUser === user && <div style={{ position: "absolute", left: 0, top: "20%", height: "60%", width: 3, background: "var(--accent)", borderRadius: "0 3px 3px 0" }} />}<div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: grad, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{user[0].toUpperCase()}<div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: onlineUsers.includes(user) ? "#10b981" : "rgba(255,255,255,0.2)", border: "2px solid var(--glass2)", boxShadow: onlineUsers.includes(user) ? "0 0 5px #10b981" : "none" }} /></div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user}</div><div style={{ fontSize: 11, color: onlineUsers.includes(user) ? "#10b981" : "var(--text-sub)" }}>{onlineUsers.includes(user) ? "● Active" : "○ Offline"}</div></div>{dmUnread[user] > 0 && <div style={{ minWidth: 18, height: 18, borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{dmUnread[user]}</div>}</div>); })}
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--accent)", opacity: 0.7, padding: "14px 10px 5px", display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 8, opacity: 0.6 }}>✦</span> Online — {onlineUsers.filter(u => u !== name && friends.includes(u)).length}</div>
               {onlineUsers.filter(u => u !== name && friends.includes(u)).map((user, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, marginBottom: 2 }}><div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{user[0].toUpperCase()}<div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: "#10b981", border: "2px solid var(--glass2)", boxShadow: "0 0 5px #10b981" }} /></div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user}{user === name ? " (you)" : ""}</div><div style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 3 }}>
                 {user === name ? <><span style={{ fontSize: 10 }}>🟢</span><span style={{ color: "#10b981", fontWeight: 600 }}>ONLINE</span></> : typingUsers.includes(user) ? <span style={{ color: "var(--accent)" }}>✍️ typing…</span> : <>
                   <span style={{ fontSize: 10 }}>{moodMap[user]?.emoji || "🟢"}</span>
-                  <span style={{ color: ({ONLINE:"#10b981",FOCUSED:"#6366f1",GAMING:"#8b5cf6",STUDYING:"#f59e0b",BUSY:"#ef4444",CHILL:"#06b6d4",INVISIBLE:"#6b7280"})[moodMap[user]?.mood] || "#10b981", fontWeight: 600 }}>{moodMap[user]?.mood || "ONLINE"}</span>
+                  <span style={{ color: ({ ONLINE: "#10b981", FOCUSED: "#6366f1", GAMING: "#8b5cf6", STUDYING: "#f59e0b", BUSY: "#ef4444", CHILL: "#06b6d4", INVISIBLE: "#6b7280" })[moodMap[user]?.mood] || "#10b981", fontWeight: 600 }}>{moodMap[user]?.mood || "ONLINE"}</span>
                 </>}
               </div></div></div>))}
             </div>
             <div style={{ padding: "8px 10px", borderTop: "1px solid var(--divider)", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, background: "var(--glass2)", position: "relative" }}>
               {/* Discord-style profile popup */}
               {showProfilePopup && (
-                <div style={{ position: "fixed", bottom: 68, left: 8, zIndex: 1000, width: 240, background: dark ? "#18141f" : "#f2f0ff", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,0.7)", overflow: "hidden" }}>
-                  {/* Banner + Avatar */}
-                  <div style={{ height: 56, background: "linear-gradient(135deg,#5865f2,#7b8cff)", position: "relative", flexShrink: 0 }}>
-                    <div style={{ position: "absolute", bottom: -22, left: 12, width: 50, height: 50, borderRadius: "50%", background: dark ? "#18141f" : "#f2f0ff", padding: 3, boxSizing: "border-box" }}>
-                      <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "var(--bubble-me)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", position: "relative" }}>
-                        {myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : name[0]?.toUpperCase()}
-                        <div style={{ position: "absolute", bottom: 1, right: 1, width: 13, height: 13, borderRadius: "50%", background: ({ONLINE:"#23a55a",IDLE:"#f0b232",DND:"#ed4245",INVISIBLE:"#80848e"})[myMood] || "#23a55a", border: `3px solid ${dark ? "#18141f" : "#f2f0ff"}` }} />
-                      </div>
+                <div
+                  ref={profilePopupRef}
+                  style={{
+                    position: "fixed", bottom: 76, left: 8, zIndex: 1000,
+                    width: 260,
+                    background: dark ? "#1e1f22" : "#ffffff",
+                    borderRadius: 8,
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)",
+                    overflow: "visible",
+                    fontFamily: "inherit",
+                  }}>
+
+                  {/* Banner */}
+                  <div style={{
+                    height: 60,
+                    background: "linear-gradient(135deg,#5865f2,#7b8cff)",
+                    borderRadius: "8px 8px 0 0",
+                  }} />
+
+                  {/* Avatar ring — sits on top of banner, not clipped */}
+                  <div style={{
+                    position: "absolute", top: 28, left: 16,
+                    width: 56, height: 56,
+                    borderRadius: "50%",
+                    background: dark ? "#1e1f22" : "#ffffff",
+                    padding: 4,
+                    boxSizing: "border-box",
+                    zIndex: 3,
+                  }}>
+                    <div style={{
+                      width: "100%", height: "100%", borderRadius: "50%",
+                      background: "var(--bubble-me)", overflow: "hidden",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 20, fontWeight: 700, color: "#fff", position: "relative",
+                    }}>
+                      {myProfile?.avatarUrl
+                        ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : name[0]?.toUpperCase()}
+                      {/* Status dot */}
+                      <div style={{
+                        position: "absolute", bottom: 1, right: 1,
+                        width: 14, height: 14, borderRadius: "50%",
+                        background: ({ ONLINE: "#23a55a", IDLE: "#f0b232", DND: "#ed4245", INVISIBLE: "#80848e" })[myMood] || "#23a55a",
+                        border: `3px solid ${dark ? "#1e1f22" : "#ffffff"}`,
+                      }} />
                     </div>
                   </div>
-                  <div style={{ padding: "30px 12px 8px" }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: dark ? "#fff" : "#111" }}>{myProfile?.displayName || name}</div>
-                    <div style={{ fontSize: 12, color: dark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.4)" }}>{name}</div>
+
+                  {/* Name block */}
+                  <div style={{
+                    padding: "36px 16px 12px",
+                    borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`,
+                  }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: dark ? "#f2f3f5" : "#060607", lineHeight: 1.3 }}>
+                      {myProfile?.displayName || name}
+                    </div>
+                    <div style={{ fontSize: 12, color: dark ? "#949ba4" : "#4e5058", marginTop: 2 }}>
+                      {name}
+                    </div>
                   </div>
-                  <div style={{ height: 1, background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)", margin: "4px 0" }} />
-                  <div style={{ padding: "4px 6px 8px" }}>
-                    <button onClick={() => { setShowProfile(true); setShowProfilePopup(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6, border: "none", background: "transparent", color: dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)", fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }} onMouseEnter={e => e.currentTarget.style.background=dark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.06)"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+
+                  {/* Menu items */}
+                  <div style={{ padding: "6px 8px 8px" }}>
+
+                    {/* Edit Profile */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowProfilePopup(false); setTimeout(() => setShowProfile(true), 50); }}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 4, border: "none", background: "transparent", color: dark ? "#dcddde" : "#2e3338", fontFamily: "inherit", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
+                      onMouseEnter={e => e.currentTarget.style.background = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                       ✏️ Edit Profile
                     </button>
-                    <button onClick={() => setShowStatusMenu(v => !v)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6, border: "none", background: "transparent", color: dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)", fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }} onMouseEnter={e => e.currentTarget.style.background=dark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.06)"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
-                      <span style={{ width: 12, height: 12, borderRadius: "50%", background: ({ONLINE:"#23a55a",IDLE:"#f0b232",DND:"#ed4245",INVISIBLE:"#80848e"})[myMood] || "#23a55a", flexShrink: 0 }} />
-                      <span style={{ flex: 1 }}>{({ONLINE:"Online",IDLE:"Idle",DND:"Do Not Disturb",INVISIBLE:"Invisible"})[myMood] || "Online"}</span>
-                      <span style={{ opacity: 0.3, fontSize: 11 }}>›</span>
+
+                    {/* Status button */}
+                    <button
+                      onClick={() => setShowStatusMenu(v => !v)}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 4, border: "none", background: "transparent", color: dark ? "#dcddde" : "#2e3338", fontFamily: "inherit", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
+                      onMouseEnter={e => e.currentTarget.style.background = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <span style={{ width: 12, height: 12, borderRadius: "50%", background: ({ ONLINE: "#23a55a", IDLE: "#f0b232", DND: "#ed4245", INVISIBLE: "#80848e" })[myMood] || "#23a55a", flexShrink: 0 }} />
+                      <span style={{ flex: 1 }}>{({ ONLINE: "Online", IDLE: "Idle", DND: "Do Not Disturb", INVISIBLE: "Invisible" })[myMood] || "Online"}</span>
+                      <span style={{ opacity: 0.4, fontSize: 12 }}>›</span>
                     </button>
+
+                    {/* Status submenu */}
                     {showStatusMenu && (
-                      <div style={{ background: dark ? "#111018" : "#eeeaf8", borderRadius: 8, margin: "2px 0 4px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      <div style={{ background: dark ? "#111214" : "#f2f3f5", borderRadius: 6, margin: "2px 0 4px", overflow: "hidden", border: `1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}` }}>
                         {[
-                          { v:"ONLINE",    label:"Online",          desc:"",                                            dot:"#23a55a" },
-                          { v:"IDLE",      label:"Idle",             desc:"",                                            dot:"#f0b232" },
-                          { v:"DND",       label:"Do Not Disturb",   desc:"You will not receive desktop notifications",  dot:"#ed4245" },
-                          { v:"INVISIBLE", label:"Invisible",        desc:"You will appear offline",                     dot:"#80848e" },
+                          { v: "ONLINE",    label: "Online",          desc: "",                                           dot: "#23a55a" },
+                          { v: "IDLE",      label: "Idle",            desc: "",                                           dot: "#f0b232" },
+                          { v: "DND",       label: "Do Not Disturb",  desc: "You will not receive notifications",         dot: "#ed4245" },
+                          { v: "INVISIBLE", label: "Invisible",       desc: "You will appear offline to others",          dot: "#80848e" },
                         ].map(s => (
-                          <button key={s.v} onClick={() => { setMyMood(s.v); fetch(`http://192.168.100.127:8080/auth/mood`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ mood: s.v }) }).catch(() => {}); if (stompClient.current?.connected) stompClient.current.publish({ destination: "/app/presence", body: JSON.stringify({ sender: nameRef.current, status: s.v === "INVISIBLE" ? "OFFLINE" : "ONLINE" }) }); setShowStatusMenu(false); setShowProfilePopup(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "none", background: myMood === s.v ? "rgba(88,101,242,0.15)" : "transparent", color: dark ? "#fff" : "#111", fontFamily: "inherit", fontSize: 13, cursor: "pointer", textAlign: "left" }} onMouseEnter={e => { if (myMood !== s.v) e.currentTarget.style.background=dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)"; }} onMouseLeave={e => { if (myMood !== s.v) e.currentTarget.style.background="transparent"; }}>
-                            <span style={{ width: 11, height: 11, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
-                            <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{s.label}</div>{s.desc && <div style={{ fontSize: 11, color: dark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.4)", marginTop: 1 }}>{s.desc}</div>}</div>
-                            {myMood === s.v && <span style={{ color: "#23a55a", fontSize: 14 }}>✓</span>}
+                          <button key={s.v}
+                            onClick={() => {
+                              setMyMood(s.v);
+                              fetch(`http://192.168.100.127:8080/auth/mood`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ mood: s.v }) }).catch(() => {});
+                              if (stompClient.current?.connected) stompClient.current.publish({ destination: "/app/presence", body: JSON.stringify({ sender: nameRef.current, status: s.v === "INVISIBLE" ? "OFFLINE" : "ONLINE" }) });
+                              setShowStatusMenu(false);
+                              setShowProfilePopup(false);
+                            }}
+                            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "none", background: myMood === s.v ? "rgba(88,101,242,0.18)" : "transparent", color: dark ? "#dcddde" : "#2e3338", fontFamily: "inherit", fontSize: 13, cursor: "pointer", textAlign: "left" }}
+                            onMouseEnter={e => { if (myMood !== s.v) e.currentTarget.style.background = dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"; }}
+                            onMouseLeave={e => { if (myMood !== s.v) e.currentTarget.style.background = "transparent"; }}>
+                            <span style={{ width: 10, height: 10, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13 }}>{s.label}</div>
+                              {s.desc && <div style={{ fontSize: 11, color: dark ? "#949ba4" : "#4e5058", marginTop: 1 }}>{s.desc}</div>}
+                            </div>
+                            {myMood === s.v && <span style={{ color: "#23a55a", fontSize: 13 }}>✓</span>}
                           </button>
                         ))}
                       </div>
                     )}
-                    <div style={{ height: 1, background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)", margin: "4px 0" }} />
-                    <button onClick={() => { setShowSettings(true); setShowProfilePopup(false); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6, border: "none", background: "transparent", color: dark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)", fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }} onMouseEnter={e => e.currentTarget.style.background=dark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.06)"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+
+                    <div style={{ height: 1, background: dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)", margin: "6px 2px" }} />
+
+                    {/* Settings */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowProfilePopup(false); setTimeout(() => { setSettingsTab("account"); setShowSettings(true); }, 50); }}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 4, border: "none", background: "transparent", color: dark ? "#dcddde" : "#2e3338", fontFamily: "inherit", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
+                      onMouseEnter={e => e.currentTarget.style.background = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                       ⚙️ Settings
                     </button>
-                    <button onClick={() => { if (callMode) endCall(0); stompClient.current?.deactivate(); onLogout(); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6, border: "none", background: "transparent", color: "#ed4245", fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }} onMouseEnter={e => e.currentTarget.style.background="rgba(237,66,69,0.1)"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+
+                    {/* Log Out */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowProfilePopup(false); setTimeout(() => { if (callMode) endCall(0); stompClient.current?.deactivate(); onLogout(); }, 50); }}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 4, border: "none", background: "transparent", color: "#ed4245", fontFamily: "inherit", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "rgba(237,66,69,0.1)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                       🚪 Log Out
                     </button>
+
                   </div>
                 </div>
               )}
               {/* Avatar button */}
               <div onClick={e => { e.stopPropagation(); setShowProfilePopup(v => !v); setShowStatusMenu(false); }} style={{ position: "relative", width: 34, height: 34, borderRadius: "50%", background: "var(--bubble-me)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0, overflow: "hidden" }}>
                 {myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} /> : name[0]?.toUpperCase()}
-                <div style={{ position: "absolute", bottom: 1, right: 1, width: 11, height: 11, borderRadius: "50%", background: ({ONLINE:"#23a55a",IDLE:"#f0b232",DND:"#ed4245",INVISIBLE:"#80848e"})[myMood] || "#23a55a", border: "2px solid var(--glass2)" }} />
+                <div style={{ position: "absolute", bottom: 1, right: 1, width: 11, height: 11, borderRadius: "50%", background: ({ ONLINE: "#23a55a", IDLE: "#f0b232", DND: "#ed4245", INVISIBLE: "#80848e" })[myMood] || "#23a55a", border: "2px solid var(--glass2)" }} />
               </div>
               <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={e => { e.stopPropagation(); setShowProfilePopup(v => !v); setShowStatusMenu(false); }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{myProfile?.displayName || name}</div>
                 <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>{name}</div>
               </div>
               <button onClick={e => { e.stopPropagation(); setShowSettings(true); }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 16, padding: "3px", opacity: 0.55, borderRadius: 6 }} title="Settings">⚙️</button>
-            </div>'
+            </div>
           </div>
 
           {view === "friends" && (<FriendsPage allUsers={allUsers} onlineUsers={onlineUsers} friends={friends} friendReqs={friendReqs} incomingReqs={incomingReqs} onSendReq={sendFriendReq} onAccept={acceptFriendReq} onRemove={removeFriend} onDm={(user) => { openDm(user); }} name={name} />)}
@@ -1654,21 +1937,45 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
               <div className="input-row">
                 <textarea ref={inputRef} className="msg-ta" value={message} onChange={handleInput} onKeyDown={handleKeyDown} placeholder="Message…" rows={1} />
                 <div className="input-icons">
-                  <button className="ico-btn" title="Send photo" onClick={() => imageInputRef.current.click()}><IcoImage color={IC} size={20} /></button>
+                  <button className="ico-btn" title="Send photo or video" onClick={() => imageInputRef.current.click()}><IcoImage color={IC} size={20} /></button>
                   <button className="ico-btn" title="Attach file" onClick={() => fileInputRef.current.click()}><IcoPaperclip color={IC} size={20} /></button>
-                  <button className="ico-btn" title="Send video" onClick={() => videoInputRef.current.click()}><IcoVideo color={IC} size={20} /></button>
-                  <button className={`ico-btn${recording ? " rec" : ""}`} title={recording ? "Stop recording" : "Voice message"} onClick={recording ? stopRecording : startRecording}>{recording ? <IcoMicOff color="#ef4444" size={20} /> : <IcoMic color={IC} size={20} />}</button>
+                  <button
+                    className={`ico-btn${recording ? " rec" : ""}`}
+                    title={recording ? "Stop recording" : "Record voice message"}
+                    onClick={recording
+                      ? () => {
+                        // Just stop — do NOT set sendVoiceOnStopRef
+                        // Only the Send button should trigger upload
+                        stopRecording();
+                      }
+                      : startRecording
+                    }
+                  >{recording ? <IcoMicOff color="#ef4444" size={20} /> : <IcoMic color={IC} size={20} />}</button>
                   <button className="ico-btn" title="Emoji" onClick={(e) => { e.stopPropagation(); setShowEmoji(v => !v); }}><IcoSmile color={IC} size={20} /></button>
-                  <button className="send-btn" title="Send" onClick={sendMessage}><IcoSend color="#fff" size={17} /></button>
+                  <button className="send-btn" title="Send" onClick={() => {
+                    if (recording) {
+                      // Recording is active — flag to upload then stop
+                      sendVoiceOnStopRef.current = true;
+                      stopRecording();
+                    } else {
+                      sendMessage();
+                    }
+                  }}><IcoSend color="#fff" size={17} /></button>
                 </div>
               </div>
               {recording && (<div className="rec-badge"><span className="rec-dot" /> Recording {recordSecs}s — tap mic to stop</div>)}
               {showEmoji && (<EmojiPicker onSelect={insertEmoji} emojiRef={emojiRef} />)}
             </div>
           </div>}
-          <input type="file" accept="image/*" ref={imageInputRef} style={{ display: "none" }} onChange={handleImageChange} />
+          <input type="file" accept="image/*,video/*" ref={imageInputRef} style={{ display: "none" }} onChange={(e) => {
+            const f = e.target.files[0];
+            if (!f) return;
+            if (f.type.startsWith("video/")) uploadFile(f, "VIDEO");
+            else uploadFile(f, "IMAGE");
+            e.target.value = "";
+          }} />
           <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileChange} />
-          <input type="file" accept="video/*" ref={videoInputRef} style={{ display: "none" }} onChange={handleVideoChange} />
+
         </div>
         {callMode && !callMinimized && (
           <CallOverlay key={callKey} mode={callMode} myName={name} stompClient={stompClient} onEnd={endCall} onMinimize={() => setCallMinimized(true)} />
@@ -1686,7 +1993,41 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
         )}
       </div>
       {showSettings && (<SettingsModal onClose={() => setShowSettings(false)} tab={settingsTab} setTab={setSettingsTab} dark={dark} setDark={setDark} theme={theme} setTheme={setTheme} authToken={authToken} authUser={authUser} myProfile={myProfile} onUpdateProfile={(data) => setMyProfile(prev => ({ ...prev, ...data }))} fontSize={fontSize} setFontSize={(v) => { setFontSize(v); localStorage.setItem("fontSize", v); }} notifSound={notifSound} setNotifSound={(v) => { setNotifSound(v); localStorage.setItem("notifSound", String(v)); }} compactMode={compactMode} setCompactMode={(v) => { setCompactMode(v); localStorage.setItem("compactMode", String(v)); }} privacyDm={privacyDm} setPrivacyDm={(v) => { setPrivacyDm(v); localStorage.setItem("privacyDm", v); }} privacyFriend={privacyFriend} setPrivacyFriend={(v) => { setPrivacyFriend(v); localStorage.setItem("privacyFriend", v); }} onLogout={onLogout} onEndCall={() => { if (callMode) endCall(0); }} chatTheme={chatTheme} setChatTheme={(v) => { setChatTheme(v); localStorage.setItem("chatTheme", v); }} />)}
-      {showCreateRoom && <CreateRoomModal onClose={() => setShowCreateRoom(false)} onCreate={createRoom} />}
+      {showCreateRoom && <CreateRoomModal onClose={() => { setShowCreateRoom(false); setCreateRoomError(null); }} onCreate={createRoom} error={createRoomError} />}
+
+      {/* Toast notifications */}
+      <div style={{
+        position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+        zIndex: 9999, display: "flex", flexDirection: "column", gap: 8,
+        alignItems: "center", pointerEvents: "none",
+      }}>
+        {toasts.map(toast => (
+          <div key={toast.id} style={{
+            background: toast.type === "error" ? "rgba(239,68,68,0.95)" :
+              toast.type === "success" ? "rgba(34,197,94,0.95)" :
+                toast.type === "info" ? "rgba(99,102,241,0.95)" :
+                  "rgba(239,68,68,0.95)",
+            color: "#fff",
+            padding: "12px 20px",
+            borderRadius: 12,
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: "inherit",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            backdropFilter: "blur(12px)",
+            maxWidth: 380,
+            textAlign: "center",
+            lineHeight: 1.5,
+            animation: "riseUp 0.25s ease",
+            pointerEvents: "all",
+          }}>
+            {toast.type === "error" ? "⚠️ " :
+              toast.type === "success" ? "✅ " :
+                toast.type === "info" ? "ℹ️ " : "⚠️ "}
+            {toast.message}
+          </div>
+        ))}
+      </div>
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} authToken={authToken} user={{ ...myProfile, username: name }} onUpdate={(data) => setMyProfile(prev => ({ ...prev, ...data }))} />}
     </>
   );

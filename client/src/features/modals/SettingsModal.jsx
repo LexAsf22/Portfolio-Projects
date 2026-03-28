@@ -9,14 +9,14 @@ import {
   updateEmail, changeUsername,
   sendVerificationCode, changePassword,
   deleteAccount,
-}                             from "../../shared/services/apiService";
-import { resolveUrl }         from "../../shared/utils/formatters";
+} from "../../shared/services/apiService";
+import { resolveUrl } from "../../shared/utils/formatters";
 import {
   inputStyle, sectionLabelStyle, msgStyle, msgIcon,
   toggleTrackStyle, toggleThumbStyle, primaryBtnStyle,
   isValidEmail,
-}                             from "./modal.utils";
-import { SETTINGS_TABS }      from "./modal.constants";
+} from "./modal.utils";
+import { SETTINGS_TABS } from "./modal.constants";
 
 // ─── Sub-components (private to this file) ────────────────────────────────────
 
@@ -94,26 +94,26 @@ export default function SettingsModal({
   keybinds, saveKeybinds,
 }) {
   // ── Local form state ──────────────────────────────────────────────────────
-  const [currentPw,  setCurrentPw]  = useState("");
-  const [newPw,      setNewPw]      = useState("");
-  const [confirmPw,  setConfirmPw]  = useState("");
-  const [pwMsg,      setPwMsg]      = useState(null);
-  const [emailMsg,   setEmailMsg]   = useState(null);
-  const [email,      setEmail]      = useState(myProfile?.email || "");
-  const [displayName,setDisplayName]= useState(myProfile?.displayName || "");
-  const [bio,        setBio]        = useState(myProfile?.bio || "");
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwMsg, setPwMsg] = useState(null);
+  const [emailMsg, setEmailMsg] = useState(null);
+  const [email, setEmail] = useState(myProfile?.email || "");
+  const [displayName, setDisplayName] = useState(myProfile?.displayName || "");
+  const [bio, setBio] = useState(myProfile?.bio || "");
   const [profileMsg, setProfileMsg] = useState(null);
   const [verifyCode, setVerifyCode] = useState("");
-  const [codeSent,   setCodeSent]   = useState(false);
-  const [sendingCode,setSendingCode]= useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
 
   const fileRef = useRef(null);
 
   // ── Shared style shortcuts ────────────────────────────────────────────────
-  const label    = sectionLabelStyle();
-  const saveBtn  = { ...primaryBtnStyle(true), padding: "10px 22px", fontSize: 13 };
-  const sTitle   = { fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 4, marginTop: 24 };
-  const sDesc    = { fontSize: 13, color: "var(--text-sub)", marginBottom: 16 };
+  const label = sectionLabelStyle();
+  const saveBtn = { ...primaryBtnStyle(true), padding: "10px 22px", fontSize: 13 };
+  const sTitle = { fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 4, marginTop: 24 };
+  const sDesc = { fontSize: 13, color: "var(--text-sub)", marginBottom: 16 };
 
   const avatarSrc = myProfile?.avatarUrl ? resolveUrl(myProfile.avatarUrl) : null;
 
@@ -151,15 +151,19 @@ export default function SettingsModal({
 
   const handleSaveEmail = async () => {
     setEmailMsg(null);
-    if (!email.trim()) { setEmailMsg({ ok: false, text: "Email cannot be empty." }); return; }
-    if (!isValidEmail(email)) { setEmailMsg({ ok: false, text: "Please enter a valid email address." }); return; }
-    try {
-      await updateEmail(authToken, email);
-      setEmailMsg({ ok: true, text: "Email updated!" });
-      onUpdateProfile({ email });
-    } catch (err) {
-      setEmailMsg({ ok: false, text: err.message });
-    }
+    <button style={saveBtn} onClick={async () => {
+      setEmailMsg(null);
+      if (!email.trim()) { setEmailMsg({ ok: false, text: "Email cannot be empty." }); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailMsg({ ok: false, text: "Please enter a valid email address." }); return; }
+      try {
+        const res = await fetch(`${BASE}/auth/update-email`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newEmail: email }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setEmailMsg({ ok: false, text: data.error || `Error ${res.status}` }); return; }
+        setEmailMsg({ ok: true, text: "Email updated successfully!" });
+        onUpdateProfile({ email });
+        setTimeout(() => setTab("account"), 1500);
+      } catch { setEmailMsg({ ok: false, text: "Network error. Check your connection." }); }
+    }}>Save Email</button>
   };
 
   const handleSaveProfile = async () => {
@@ -203,13 +207,13 @@ export default function SettingsModal({
 
   // ── Tab definitions ───────────────────────────────────────────────────────
   const tabs = [
-    { id: SETTINGS_TABS.ACCOUNT,      label: "👤 My Account",       group: "USER SETTINGS" },
-    { id: SETTINGS_TABS.PROFILE,      label: "🪪 Profile",           group: "USER SETTINGS" },
-    { id: SETTINGS_TABS.PRIVACY,      label: "🔒 Privacy & Safety",  group: "USER SETTINGS" },
-    { id: SETTINGS_TABS.APPEARANCE,   label: "🎨 Appearance",        group: "APP SETTINGS"  },
-    { id: SETTINGS_TABS.NOTIFICATIONS,label: "🔔 Notifications",     group: "APP SETTINGS"  },
-    { id: SETTINGS_TABS.KEYBINDS,     label: "⌨️ Keybinds",          group: "APP SETTINGS"  },
-    { id: SETTINGS_TABS.DANGER,       label: "⚠️ Danger Zone",       group: "ACCOUNT"       },
+    { id: SETTINGS_TABS.ACCOUNT, label: "👤 My Account", group: "USER SETTINGS" },
+    { id: SETTINGS_TABS.PROFILE, label: "🪪 Profile", group: "USER SETTINGS" },
+    { id: SETTINGS_TABS.PRIVACY, label: "🔒 Privacy & Safety", group: "USER SETTINGS" },
+    { id: SETTINGS_TABS.APPEARANCE, label: "🎨 Appearance", group: "APP SETTINGS" },
+    { id: SETTINGS_TABS.NOTIFICATIONS, label: "🔔 Notifications", group: "APP SETTINGS" },
+    { id: SETTINGS_TABS.KEYBINDS, label: "⌨️ Keybinds", group: "APP SETTINGS" },
+    { id: SETTINGS_TABS.DANGER, label: "⚠️ Danger Zone", group: "ACCOUNT" },
   ];
   const groups = [...new Set(tabs.map(t => t.group))];
 
@@ -468,12 +472,12 @@ export default function SettingsModal({
     // ── keybinds tab ───────────────────────────────────────────────────────
     if (tab === SETTINGS_TABS.KEYBINDS) {
       const actions = [
-        { key: "sendMessage",  label: "Send message",     hint: "Enter / Shift+Enter for newline" },
-        { key: "toggleMute",   label: "Mute/unmute mic",  hint: "In call" },
-        { key: "toggleCamera", label: "Toggle camera",    hint: "In video call" },
-        { key: "leaveCall",    label: "Leave call",       hint: "" },
-        { key: "closeModal",   label: "Close modal",      hint: "" },
-        { key: "openSettings", label: "Open settings",    hint: "When not typing" },
+        { key: "sendMessage", label: "Send message", hint: "Enter / Shift+Enter for newline" },
+        { key: "toggleMute", label: "Mute/unmute mic", hint: "In call" },
+        { key: "toggleCamera", label: "Toggle camera", hint: "In video call" },
+        { key: "leaveCall", label: "Leave call", hint: "" },
+        { key: "closeModal", label: "Close modal", hint: "" },
+        { key: "openSettings", label: "Open settings", hint: "When not typing" },
       ];
       return (
         <div>

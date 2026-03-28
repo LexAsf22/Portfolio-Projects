@@ -25,10 +25,16 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() ->
                         new UsernameNotFoundException("User not found: " + username));
 
+        // FIX: Use the actual role from the database (MEMBER, ADMIN, MODERATOR)
+        // instead of hardcoded "USER" — this makes @PreAuthorize checks work correctly
+        String role = (user.getRole() != null && !user.getRole().isBlank())
+                ? user.getRole()
+                : "MEMBER";
+
         return User.builder()
                 .username(user.getUsername())
                 .password(user.getPassword())
-                .roles("USER")
+                .roles(role)   // Spring prefixes "ROLE_" automatically → ROLE_MEMBER, ROLE_ADMIN
                 .build();
     }
 }

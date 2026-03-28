@@ -17,24 +17,32 @@ export default function ProfileModal({ onClose, authToken, user, onUpdate }) {
   const [displayName, setDisplayName] = useState(user?.displayName || user?.username || "");
   const [bio,         setBio]         = useState(user?.bio || "");
   const [saving,      setSaving]      = useState(false);
+  const [msg,         setMsg]         = useState(null);
 
   const fileRef = useRef(null);
 
   const save = async () => {
-    setSaving(true);
+    setSaving(true); setMsg(null);
     try {
       const data = await updateProfile(authToken, { displayName, bio });
       onUpdate(data);
-    } catch { /* ignore */ }
+      setMsg({ ok: true, text: "Profile saved!" });
+      setTimeout(() => onClose(), 800);
+    } catch (e) {
+      setMsg({ ok: false, text: e.message || "Failed to save profile" });
+    }
     setSaving(false);
-    onClose();
   };
 
   const handleAvatarUpload = async (file) => {
+    setMsg(null);
     try {
       const data = await uploadAvatar(authToken, file);
       onUpdate({ avatarUrl: data.avatarUrl });
-    } catch { /* ignore */ }
+      setMsg({ ok: true, text: "Avatar updated!" });
+    } catch (e) {
+      setMsg({ ok: false, text: e.message || "Failed to upload avatar" });
+    }
   };
 
   const avatarSrc = user?.avatarUrl ? resolveUrl(user.avatarUrl) : null;
@@ -88,6 +96,20 @@ export default function ProfileModal({ onClose, authToken, user, onUpdate }) {
             onChange={e => { if (e.target.files[0]) handleAvatarUpload(e.target.files[0]); }}
           />
         </div>
+
+        {/* Inline message */}
+        {msg && (
+          <div style={{
+            marginBottom: 14, padding: "10px 14px", borderRadius: 10,
+            background: msg.ok ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
+            border: `1px solid ${msg.ok ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
+            color: msg.ok ? "#4ade80" : "#fb7185",
+            fontSize: 13, fontWeight: 500,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            {msg.ok ? "✅" : "⚠️"} {msg.text}
+          </div>
+        )}
 
         {/* Display name */}
         <label style={{

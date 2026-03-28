@@ -70,11 +70,10 @@ public class RoomController {
 
     // ── REST: get single room ──────────────────────────────────
     // FIX: Was missing — caused "channels do not display information"
-    @GetMapping("/rooms/{id}")
+    @PutMapping("/rooms/{id}")
     @ResponseBody
-    @PutMapping("/{id}")
     public ResponseEntity<?> updateRoom(@PathVariable Long id, @RequestBody Room updates,
-                                         @RequestHeader("Authorization") String authHeader) {
+                                     @RequestHeader("Authorization") String authHeader) {
         return roomRepository.findById(id).map(room -> {
             if (updates.getName() != null && !updates.getName().isBlank())
                 room.setName(updates.getName());
