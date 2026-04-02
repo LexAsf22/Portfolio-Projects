@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
+import ReactDOM from "react-dom";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 
 const svgBase = (size) => ({
-  display: "block",
   width: size,
   height: size,
   overflow: "visible",
@@ -614,6 +614,9 @@ function CreateRoomModal({ onClose, onCreate, error }) {
   const [template, setTemplate] = useState(null);
   const [roomName, setRoomName] = useState("");
   const [roomType, setRoomType] = useState("public");
+  const [iconFile, setIconFile] = useState(null);
+  const [iconPreview, setIconPreview] = useState(null);
+  const iconInputRef = useRef(null);
   const templates = [
     { id: "own", emoji: "🌟", label: "Create My Own", desc: "Start fresh with a blank room", color: "linear-gradient(135deg,#7c3aed,#a855f7)" },
     { id: "gaming", emoji: "🎮", label: "Gaming", desc: "A place for your gaming squad", color: "linear-gradient(135deg,#059669,#10b981)" },
@@ -632,8 +635,13 @@ function CreateRoomModal({ onClose, onCreate, error }) {
   const handleTemplateSelect = (t) => { setTemplate(t.id); setRoomName(t.id === "own" ? "" : t.label + " Room"); setStep("configure"); };
   const handleCreate = () => {
     if (!roomName.trim()) return;
-    // FIX: removed onClose() here — parent closes modal only on success
-    onCreate({ name: roomName.trim(), template, emoji: selectedTemplate?.emoji || "🌟", type: roomType });
+    onCreate({
+      name: roomName.trim(),
+      template,
+      emoji: selectedTemplate?.emoji || "🌟",
+      type: roomType,
+      iconFile, // pass the file to parent
+    });
   };
   const overlay = { position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.15s", padding: 20 };
   const modal = { width: "100%", maxWidth: 460, background: "var(--glass2)", borderRadius: 20, border: "1px solid var(--glass-border)", boxShadow: "0 32px 80px rgba(0,0,0,0.5)", overflow: "hidden", animation: "scalePop 0.2s cubic-bezier(0.34,1.56,0.64,1)" };
@@ -665,6 +673,55 @@ function CreateRoomModal({ onClose, onCreate, error }) {
           </div>
         ) : (
           <div style={{ padding: "0 24px 24px" }}>
+            {/* Room Icon Picker */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Room Icon</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {/* Icon preview */}
+                <div
+                  onClick={() => iconInputRef.current?.click()}
+                  style={{ width: 64, height: 64, borderRadius: 16, background: iconPreview ? "transparent" : "var(--accent-soft)", border: `2px dashed ${iconPreview ? "var(--accent)" : "var(--glass-border)"}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", flexShrink: 0, transition: "all 0.15s", fontSize: 28 }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = "var(--accent)"}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = iconPreview ? "var(--accent)" : "var(--glass-border)"}>
+                  {iconPreview
+                    ? <img src={iconPreview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : (selectedTemplate?.emoji || "🌟")}
+                </div>
+                <div>
+                  <button
+                    onClick={() => iconInputRef.current?.click()}
+                    style={{ padding: "7px 14px", borderRadius: 8, border: "1.5px solid var(--glass-border)", background: "var(--btn-bg)", color: "var(--text)", fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "block", marginBottom: 6 }}>
+                    {iconPreview ? "Change Icon" : "Upload Icon"}
+                  </button>
+                  {iconPreview && (
+                    <button
+                      onClick={() => { setIconFile(null); setIconPreview(null); }}
+                      style={{ padding: "5px 14px", borderRadius: 8, border: "1.5px solid rgba(251,113,133,0.3)", background: "transparent", color: "#fb7185", fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "block" }}>
+                      Remove
+                    </button>
+                  )}
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: iconPreview ? 0 : 4 }}>
+                    JPG, PNG, GIF, WebP. Max 5MB.
+                  </div>
+                </div>
+              </div>
+              <input
+                ref={iconInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={e => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5MB"); return; }
+                  setIconFile(file);
+                  setIconPreview(URL.createObjectURL(file));
+                  e.target.value = "";
+                }}
+              />
+            </div>
+
+            {/* Room Name */}
             <div style={{ marginBottom: 16 }}><div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Room Name</div><input style={inputStyle} value={roomName} onChange={e => setRoomName(e.target.value)} placeholder="Enter room name" autoFocus onKeyDown={e => e.key === "Enter" && handleCreate()} /></div>
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Room Type</div>
@@ -788,16 +845,16 @@ function SettingsModal({ onClose, tab, setTab, dark, setDark, theme, setTheme, a
   const renderContent = () => {
     if (tab === "account-email") return (<div><div style={sectionTitle}>Update Email Address</div><p style={sectionDesc}>This email is used for password reset verification codes.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>{emailMsg && <div style={msgStyle(emailMsg.ok)}>{emailMsg.ok ? "✅" : "⚠️"} {emailMsg.text}</div>}<label style={labelStyle}>New Email Address</label><input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" /><div style={{ display: "flex", gap: 10, marginTop: 4 }}><button style={saveBtn} onClick={async () => { setEmailMsg(null); if (!email.trim()) { setEmailMsg({ ok: false, text: "Email cannot be empty." }); return; } if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailMsg({ ok: false, text: "Please enter a valid email address." }); return; } try { const res = await fetch(`${BASE}/auth/update-email`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newEmail: email }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { setEmailMsg({ ok: false, text: data.error || data.message || `Error ${res.status}` }); return; } setEmailMsg({ ok: true, text: "Email updated successfully!" }); onUpdateProfile({ email }); setTimeout(() => setTab("account"), 1500); } catch { setEmailMsg({ ok: false, text: "Network error. Check your connection." }); } }}>Save Email</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => setTab("account")}>Cancel</button></div></div></div>);
     if (tab === "account-username") return (<div><div style={sectionTitle}>Change Username</div><p style={sectionDesc}>Choose a new unique username. You will be issued a new login token.</p><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>{pwMsg && <div style={msgStyle(pwMsg.ok)}>{pwMsg.ok ? "✅" : "⚠️"} {pwMsg.text}</div>}<label style={labelStyle}>New Username</label><input style={inputStyle} value={currentPw} onChange={e => setCurrentPw(e.target.value)} placeholder="Enter new username (3–32 chars, letters/numbers/_/.)" /><div style={{ display: "flex", gap: 10, marginTop: 4 }}><button style={saveBtn} onClick={async () => {
-                  setPwMsg(null);
-                  if (!currentPw.trim()) { setPwMsg({ ok: false, text: "Username cannot be empty." }); return; }
-                  try {
-                    const res = await fetch(`${BASE}/auth/change-username`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newUsername: currentPw }) });
-                    const data = await res.json();
-                    if (!res.ok) { setPwMsg({ ok: false, text: data.error || "Failed to change username" }); return; }
-                    setPwMsg({ ok: true, text: "Username changed! Logging you out..." });
-                    setTimeout(() => { onEndCall?.(); onLogout(); }, 1500);
-                  } catch { setPwMsg({ ok: false, text: "Server error. Check your connection." }); }
-                }}>Save Username</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => setTab("account")}>Cancel</button></div></div></div>);
+      setPwMsg(null);
+      if (!currentPw.trim()) { setPwMsg({ ok: false, text: "Username cannot be empty." }); return; }
+      try {
+        const res = await fetch(`${BASE}/auth/change-username`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ newUsername: currentPw }) });
+        const data = await res.json();
+        if (!res.ok) { setPwMsg({ ok: false, text: data.error || "Failed to change username" }); return; }
+        setPwMsg({ ok: true, text: "Username changed! Logging you out..." });
+        setTimeout(() => { onEndCall?.(); onLogout(); }, 1500);
+      } catch { setPwMsg({ ok: false, text: "Server error. Check your connection." }); }
+    }}>Save Username</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => setTab("account")}>Cancel</button></div></div></div>);
     if (tab === "account") return (<div><div style={{ background: "var(--bubble-me)", borderRadius: 12, padding: "40px 20px 20px", marginBottom: 24, position: "relative", overflow: "hidden" }}><div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,rgba(196,109,255,0.8),rgba(123,140,255,0.8))" }} /><div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 16 }}><div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileRef.current?.click()}><div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.2)", border: "4px solid var(--glass2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, color: "#fff", overflow: "hidden" }}>{myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : authUser?.[0]?.toUpperCase()}</div><div style={{ position: "absolute", bottom: 2, right: 2, width: 22, height: 22, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, border: "2px solid var(--glass2)" }}>✏️</div></div><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) uploadAvatar(e.target.files[0]); }} /><div><div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{myProfile?.displayName || authUser}</div><div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>@{authUser}</div></div></div></div><div style={sectionTitle}>Account Information</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: "0 16px", marginBottom: 20 }}><Row label="Username" desc={`@${authUser}`}><button onClick={() => setTab("account-username")} style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }}>Change</button></Row><Row label="Email" desc={myProfile?.email || "No email set"}><button onClick={() => setTab("account-email")} style={{ ...saveBtn, fontSize: 12, padding: "6px 14px" }}>Edit</button></Row></div><div style={sectionTitle}>Change Password</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, marginBottom: 20 }}>{pwMsg && <div style={msgStyle(pwMsg.ok)}>{pwMsg.ok ? "✅" : "⚠️"} {pwMsg.text}</div>}{!codeSent ? (<><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 14, lineHeight: 1.6 }}>A 6-digit verification code will be sent to your registered email address.{!myProfile?.email && <span style={{ color: "#fb7185" }}> You need to add an email address first.</span>}</div><button style={{ ...saveBtn, opacity: myProfile?.email ? 1 : 0.5, cursor: myProfile?.email ? "pointer" : "not-allowed" }} onClick={myProfile?.email ? sendCode : undefined} disabled={sendingCode}>{sendingCode ? "Sending…" : "Send Verification Code"}</button></>) : (<><label style={labelStyle}>Verification Code</label><input style={inputStyle} value={verifyCode} onChange={e => setVerifyCode(e.target.value)} placeholder="Enter 6-digit code" maxLength={6} /><label style={labelStyle}>New Password</label><input type="password" style={inputStyle} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Enter new password" /><label style={labelStyle}>Confirm New Password</label><input type="password" style={{ ...inputStyle, marginBottom: 14 }} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Confirm new password" /><div style={{ display: "flex", gap: 10 }}><button style={saveBtn} onClick={changePassword}>Change Password</button><button style={{ ...saveBtn, background: "var(--btn-bg)", color: "var(--text-sub)" }} onClick={() => { setCodeSent(false); setPwMsg(null); setVerifyCode(""); }}>Resend Code</button></div></>)}</div><div style={sectionTitle}>Email Address</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16 }}>{emailMsg && <div style={msgStyle(emailMsg.ok)}>{emailMsg.ok ? "✅" : "⚠️"} {emailMsg.text}</div>}<label style={labelStyle}>Email</label><input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" /><button style={saveBtn} onClick={saveEmail}>Save Email</button></div></div>);
     if (tab === "profile") return (<div><div style={sectionTitle}>Display Name</div><p style={sectionDesc}>This is how others see you in chat.</p>{profileMsg && <div style={msgStyle(profileMsg.ok)}>{profileMsg.ok ? "✅" : "⚠️"} {profileMsg.text}</div>}<div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, marginBottom: 20 }}><label style={labelStyle}>Display Name</label><input style={inputStyle} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your display name" /><label style={labelStyle}>Bio</label><textarea style={{ ...inputStyle, height: 80, resize: "none" }} value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell others about yourself" /><button style={saveBtn} onClick={saveProfile}>Save Profile</button></div><div style={sectionTitle}>Avatar</div><div style={{ background: "var(--glass2)", borderRadius: 10, padding: 16, display: "flex", alignItems: "center", gap: 16 }}><div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--bubble-me)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 700, color: "#fff", overflow: "hidden", flexShrink: 0 }}>{myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : authUser?.[0]?.toUpperCase()}</div><div><div style={{ fontSize: 13, color: "var(--text-sub)", marginBottom: 10 }}>JPG, GIF or PNG. Max size 8MB.</div><div style={{ display: "flex", gap: 8 }}><button style={saveBtn} onClick={() => fileRef.current?.click()}>Change Avatar</button><input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) uploadAvatar(e.target.files[0]); }} /></div></div></div></div>);
     if (tab === "appearance") return (<div><div style={sectionTitle}>Planet Theme</div><p style={sectionDesc}>Each planet transforms the entire UI — colors, accents, and atmosphere.</p><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 24 }}>{[{ id: "galaxy", emoji: "🌌", label: "Galaxy" }, { id: "mars", emoji: "🔴", label: "Mars" }, { id: "neptune", emoji: "🔵", label: "Neptune" }, { id: "venus", emoji: "🌕", label: "Venus" }, { id: "blackhole", emoji: "⚫", label: "Black Hole" }, { id: "nebula", emoji: "💜", label: "Nebula" }].map(th => (<button key={th.id} onClick={() => { setTheme(th.id); localStorage.setItem("theme", th.id); }} style={{ padding: "14px 8px", borderRadius: 12, border: `2px solid ${theme === th.id ? "var(--accent)" : "var(--glass-border)"}`, background: theme === th.id ? "var(--accent-soft)" : "var(--glass2)", color: "var(--text)", fontFamily: "inherit", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, transition: "all 0.15s" }}><span style={{ fontSize: 26 }}>{th.emoji}</span><span>{th.label}</span></button>))}</div>
@@ -828,9 +885,9 @@ function FriendsPage({ allUsers, onlineUsers, friends, friendReqs, incomingReqs,
   const getGradient = (u) => avatarGradients[u.charCodeAt(0) % avatarGradients.length];
   const getList = () => {
     let list = [];
-    if (tab === "online") list = friends.filter(u => onlineUsers.includes(u));
-    else if (tab === "all") list = friends;
-    else if (tab === "pending") list = incomingReqs;
+    if (tab === "online") list = friends.filter(u => onlineUsers.includes(u) && u !== name);
+    else if (tab === "all") list = friends.filter(u => u !== name);
+    else if (tab === "pending") list = incomingReqs.filter(u => u !== name);
     else return [];
     if (search.trim()) list = list.filter(u => u.toLowerCase().includes(search.toLowerCase()));
     return list;
@@ -1040,6 +1097,7 @@ const buildCSSBody = (theme) => {
   .theme-fab { position:fixed; top:10px; right:10px; z-index:999; width:44px; height:26px; border:none; cursor:pointer; padding:0; border-radius:999px; background:${dark ? "rgba(30,18,55,0.85)" : "rgba(255,255,255,0.85)"}; backdrop-filter:blur(14px); border:1.5px solid ${dark ? "rgba(255,255,255,0.12)" : "rgba(140,100,200,0.35)"}; box-shadow:0 3px 14px rgba(0,0,0,0.20); }
   .theme-thumb { position:absolute; top:3px; left:${dark ? "21px" : "3px"}; width:20px; height:20px; border-radius:50%; background:${dark ? "#c46dff" : "#ffe066"}; display:flex; align-items:center; justify-content:center; pointer-events:none; transition:left 0.3s var(--spring); box-shadow:0 1px 5px rgba(0,0,0,0.25); }
   @keyframes riseUp { from{opacity:0;transform:translateY(24px) scale(0.97)} to{opacity:1;transform:none} }
+  @keyframes scalePop { from{opacity:0;transform:scale(0.88)} to{opacity:1;transform:scale(1)} }
   .join-card { width:440px; background:var(--glass2); backdrop-filter:blur(32px) saturate(160%); -webkit-backdrop-filter:blur(32px) saturate(160%); border:1px solid var(--glass-border); border-radius:28px; padding:54px 46px 50px; text-align:center; box-shadow:0 32px 80px rgba(0,0,0,0.36); animation:riseUp 0.45s var(--out) forwards; }
   .join-logo { width:70px; height:70px; border-radius:22px; background:var(--bubble-me); margin:0 auto 26px; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 28px var(--accent-glow); }
   .join-title { font-size:26px; font-weight:700; letter-spacing:-0.6px; color:var(--text); margin-bottom:7px; }
@@ -1218,6 +1276,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const [createRoomError, setCreateRoomError] = useState(null);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
+  const [profileCache, setProfileCache] = useState({});
   const [myProfile, setMyProfile] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showMoodPicker, setShowMoodPicker] = useState(false);
@@ -1252,6 +1311,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
   const [typingUsers, setTypingUsers] = useState([]);
   const typingTimeout = useRef(null);
   const [dragOver, setDragOver] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const [toasts, setToasts] = useState([]);
   const dragCounter = useRef(0);
   const [showEmoji, setShowEmoji] = useState(false);
@@ -1296,11 +1356,56 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
           return r.json();
         });
 
-      authedFetch(`http://192.168.100.127:8080/auth/users`).then(setAllUsers).catch(() => { });
+      authedFetch(`http://192.168.100.127:8080/auth/users`).then(setAllUsers).catch(() => { }); authedFetch(`http://192.168.100.127:8080/auth/users`).then(users => {
+        setAllUsers(users);
+
+        // Load all profiles into cache for avatars
+        users.forEach(username => {
+          authedFetch(`http://192.168.100.127:8080/auth/profile/${username}`)
+            .then(profile => {
+              setProfileCache(prev => ({ ...prev, [username]: profile }));
+            }).catch(() => { });
+        });
+
+        // FIX: Sync friends bidirectionally on load
+        // If another user has us in their friends list, add them to ours
+        const myFriends = JSON.parse(localStorage.getItem(`friends_${authUser}`) || "[]");
+        let updated = [...myFriends];
+        let changed = false;
+
+        users.forEach(username => {
+          if (username === authUser) return;
+          // Check if they have us as a friend (they accepted us)
+          const theirFriends = JSON.parse(localStorage.getItem(`friends_${username}`) || "[]");
+          if (theirFriends.includes(authUser) && !updated.includes(username)) {
+            updated.push(username);
+            changed = true;
+          }
+          // Also add us to their list if we have them (we accepted them)
+          if (myFriends.includes(username) && !theirFriends.includes(authUser)) {
+            const theirUpdated = [...theirFriends, authUser];
+            localStorage.setItem(`friends_${username}`, JSON.stringify(theirUpdated));
+          }
+        });
+
+        if (changed) {
+          localStorage.setItem(`friends_${authUser}`, JSON.stringify(updated));
+          setFriends(updated.filter(u => u !== authUser));
+        }
+      }).catch(() => { });
       authedFetch(`http://192.168.100.127:8080/auth/profile/${authUser}`).then(setMyProfile).catch(() => { });
-      authedFetch(`http://192.168.100.127:8080/rooms`).then(setRooms).catch(() => { });
+      authedFetch(`http://192.168.100.127:8080/rooms`).then(rooms => {
+        // Only show rooms this user created or has explicitly joined
+        const myRooms = rooms.filter(r =>
+          r.createdBy === authUser ||
+          (r.members && r.members.includes(authUser)) ||
+          r.roomType === "public" // keep public rooms visible for discoverability
+        );
+        setRooms(myRooms);
+      }).catch(() => { });
     }
   }, []); // eslint-disable-line
+
 
   useEffect(() => { messagesEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -1322,15 +1427,41 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
           setMessages(history.map((m) => ({ ...m, time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : getTime() })));
         } catch { /* ignore */ }
 
+        const loadProfileIfMissing = (username) => {
+          if (!username || profileCache[username]) return;
+          const token = authToken || localStorage.getItem("token");
+          fetch(`http://192.168.100.127:8080/auth/profile/${username}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).then(r => r.json()).then(profile => {
+            setProfileCache(prev => ({ ...prev, [username]: profile }));
+          }).catch(() => { });
+        };
+
         client.subscribe("/topic/channel1", (res) => {
           const msg = JSON.parse(res.body);
-          if (msg.type === "FRIEND_REQUEST") { if (msg.recipient === name) { const outKey = `friendreqs_out_${name}`; const existing = JSON.parse(localStorage.getItem(outKey) || "[]"); if (!existing.includes(msg.sender)) { localStorage.setItem(outKey, JSON.stringify([...existing, msg.sender])); setFriends(f => [...f]); } } return; }
+          loadProfileIfMissing(msg.sender);
           setMessages((prev) => [...prev, { ...msg, time: getTime() }]);
         });
         // call-notify subscription removed
         client.subscribe("/topic/presence", (res) => { const event = JSON.parse(res.body); setOnlineUsers(Array.from(event.onlineUsers || [])); });
         // Announce online immediately
         client.publish({ destination: "/app/presence", body: JSON.stringify({ sender: nameRef.current, status: "ONLINE" }) });
+
+        // FIX: notify all friends that we are online so they can sync
+        const myFriends = JSON.parse(localStorage.getItem(`friends_${authUser}`) || "[]");
+        myFriends.forEach(friendName => {
+          if (friendName && friendName !== nameRef.current) {
+            client.publish({
+              destination: "/app/dm.send",
+              body: JSON.stringify({
+                sender: nameRef.current,
+                recipient: friendName,
+                content: "__FRIEND_SYNC__",
+                type: "FRIEND_SYNC",
+              })
+            });
+          }
+        });
         // Heartbeat every 30s so server knows this tab is still alive
         const presenceHB = setInterval(() => {
           if (client.connected) client.publish({ destination: "/app/presence", body: JSON.stringify({ sender: nameRef.current, status: "ONLINE" }) });
@@ -1355,7 +1486,70 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
           if (event.typing) { setTypingUsers(prev => prev.includes(event.sender) ? prev : [...prev, event.sender]); }
           else { setTypingUsers(prev => prev.filter(u => u !== event.sender)); }
         });
-        client.subscribe(`/topic/dm.${name}`, (res) => { const msg = JSON.parse(res.body); const other = msg.sender === name ? msg.recipient : msg.sender; setDmMessages(prev => { const existing = prev[other] || []; if (msg.id && existing.some(m => m.id === msg.id)) return prev; return { ...prev, [other]: [...existing, { ...msg, time: getTime() }] }; }); if (msg.sender !== name) { setDmUnread(prev => ({ ...prev, [msg.sender]: (prev[msg.sender] || 0) + 1 })); if (Notification.permission === 'granted') { new Notification(`New message from ${msg.sender}`, { body: msg.content || '📎 Attachment' }); } } });
+        client.subscribe(`/topic/dm.${name}`, (res) => {
+          const msg = JSON.parse(res.body);
+
+          // FIX: Handle friend sync — if they have us as friend, add them too
+          if (msg.type === "FRIEND_SYNC" || msg.content === "__FRIEND_SYNC__") {
+            const sender = msg.sender;
+            if (sender && sender !== name) {
+              setFriends(prev => {
+                if (prev.includes(sender)) return prev;
+                const updated = [...prev, sender];
+                localStorage.setItem(`friends_${authUser}`, JSON.stringify(updated));
+                return updated;
+              });
+            }
+            return;
+          }
+
+          // Handle friend request — private, never shows in DM chat
+          if (msg.type === "FRIEND_REQUEST") {
+            // Only process if this message is actually for us (recipient check)
+            if (msg.recipient !== name) return;
+            const outKey = `friendreqs_out_${name}`;
+            const existing = JSON.parse(localStorage.getItem(outKey) || "[]");
+            if (!existing.includes(msg.sender)) {
+              localStorage.setItem(outKey, JSON.stringify([...existing, msg.sender]));
+              setFriends(f => [...f]); // trigger re-render
+            }
+            return;
+          }
+
+          // FIX: handle friend acceptance — add them to MY friends list
+          if (msg.type === "FRIEND_ACCEPTED") {
+            const sender = msg.sender;
+            if (sender && sender !== name) {
+              setFriends(prev => {
+                if (prev.includes(sender)) return prev;
+                const updated = [...prev, sender];
+                localStorage.setItem(`friends_${authUser}`, JSON.stringify(updated));
+                return updated;
+              });
+              // Remove from sent requests
+              setFriendReqs(prev => {
+                const updated = prev.filter(u => u !== sender);
+                localStorage.setItem(`friendreqs_${authUser}`, JSON.stringify(updated));
+                return updated;
+              });
+              showToast(`${sender} accepted your friend request!`, "success");
+            }
+            return;
+          }
+
+          const other = msg.sender === name ? msg.recipient : msg.sender;
+          setDmMessages(prev => {
+            const existing = prev[other] || [];
+            if (msg.id && existing.some(m => m.id === msg.id)) return prev;
+            return { ...prev, [other]: [...existing, { ...msg, time: getTime() }] };
+          });
+          if (msg.sender !== name) {
+            setDmUnread(prev => ({ ...prev, [msg.sender]: (prev[msg.sender] || 0) + 1 }));
+            if (Notification.permission === "granted") {
+              new Notification(`New message from ${msg.sender}`, { body: msg.content || "📎 Attachment" });
+            }
+          }
+        });
         client.subscribe(`/topic/dm.typing.${name}`, (res) => { const payload = JSON.parse(res.body); if (payload.sender === name) return; if (payload.typing) { setTypingUsers(prev => prev.includes(payload.sender) ? prev : [...prev, payload.sender]); } else { setTypingUsers(prev => prev.filter(u => u !== payload.sender)); } });
         client.subscribe(`/topic/dm.edit.${name}`, (res) => { const dm = JSON.parse(res.body); const other = dm.sender === name ? dm.recipient : dm.sender; setDmMessages(prev => ({ ...prev, [other]: (prev[other] || []).map(m => m.id === dm.id ? { ...m, content: dm.content, edited: true } : m) })); });
         client.subscribe(`/topic/dm.delete.${name}`, (res) => { const dm = JSON.parse(res.body); const other = dm.sender === name ? dm.recipient : dm.sender; setDmMessages(prev => ({ ...prev, [other]: (prev[other] || []).map(m => m.id === dm.id ? { ...m, content: 'This message was deleted.', deleted: true } : m) })); });
@@ -1411,6 +1605,14 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
     stompClient.current = client;
   };
 
+  const getAvatar = (username) => {
+    const profile = profileCache[username];
+    if (!profile?.avatarUrl) return null;
+    const url = profile.avatarUrl;
+    if (url.startsWith("http")) return url;
+    return `http://192.168.100.127:8080${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
   const showToast = (message, type = "error") => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -1430,7 +1632,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
     setMessage("");
   };
 
-  const openDm = (user) => { setActiveDmUser(user); setView("dm"); setTypingUsers([]); sessionStorage.setItem("view", "dm"); sessionStorage.setItem("activeDmUser", user); setDmUnread(prev => ({ ...prev, [user]: 0 })); setMessage(""); fetch(`http://192.168.100.127:8080/dm/history?userA=${name}&userB=${user}`, { headers: { Authorization: `Bearer ${authToken}` } }).then(r => r.json()).then(data => setDmMessages(prev => ({ ...prev, [user]: data.map(m => ({ ...m, time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : getTime() })) }))).catch(() => { }); };
+  const openDm = (user) => { setActiveDmUser(user); setView("dm"); setTypingUsers([]); sessionStorage.setItem("view", "dm"); sessionStorage.setItem("activeDmUser", user); setDmUnread(prev => ({ ...prev, [user]: 0 })); setMessage(""); fetch(`http://192.168.100.127:8080/dm/history?userA=${name}&userB=${user}`, { headers: { Authorization: `Bearer ${authToken}` } }).then(r => r.json()).then(data => setDmMessages(prev => ({ ...prev, [user]: data.filter(m => m.type !== "FRIEND_SYNC" && m.type !== "FRIEND_REQUEST" && m.type !== "FRIEND_ACCEPTED" && m.content !== "__FRIEND_SYNC__" && m.content !== "__FRIEND_REQUEST__" && m.content !== "__FRIEND_ACCEPTED__").map(m => ({ ...m, time: m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : getTime() })) }))).catch(() => { }); };
   const openRoom = (room) => {
     setActiveRoom(room); setView("room"); setMessage(""); setShowRoomInfo(false); setTypingUsers([]); setTypingUsers([]);
     sessionStorage.setItem("view", "room"); sessionStorage.setItem("activeRoom", JSON.stringify(room));
@@ -1444,20 +1646,19 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
     const desc = typeof roomData === "object" ? (roomData.description || roomData.template || "") : "";
     const emoji = typeof roomData === "object" ? (roomData.emoji || "🌟") : "🌟";
     const type = typeof roomData === "object" ? (roomData.type || "public") : "public";
+    const iconFile = typeof roomData === "object" ? roomData.iconFile : null;
 
-    // Guard: don't submit if name is empty
     if (!roomName?.trim()) return;
 
     try {
       const res = await fetch(`http://192.168.100.127:8080/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
-        // FIX: backend expects "type" not "roomType", and "description" not template
         body: JSON.stringify({
           name: roomName.trim(),
           description: desc,
           emoji,
-          type,          // ← was "roomType" — backend reads "type"
+          type,
           createdBy: name,
         })
       });
@@ -1472,15 +1673,41 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
         return;
       }
 
-      if (room.id) {
-        setRooms(prev => [...prev, room]);
-        setShowCreateRoom(false);
-        setCreateRoomError(null);
-        openRoom(room);
+      const room = await res.json();
+      if (!room.id) return;
+
+      // Upload icon if user picked one
+      // Upload icon if user picked one
+      if (iconFile) {
+        try {
+          const fd = new FormData();
+          fd.append("file", iconFile);
+          const iconRes = await fetch(`http://192.168.100.127:8080/rooms/${room.id}/icon`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${authToken}` },
+            body: fd,
+          });
+          if (iconRes.ok) {
+            const iconData = await iconRes.json();
+            room.iconUrl = typeof iconData === "string"
+              ? iconData
+              : (iconData.iconUrl || iconData.url || iconData.path || "");
+          }
+        } catch (e) {
+          console.warn("Icon upload failed:", e);
+        }
       }
+
+      setRooms(prev => [...prev, room]);
+      setShowCreateRoom(false);
+      setCreateRoomError(null);
+
+      // FIX: open room with the updated iconUrl included
+      openRoom(room);
+
     } catch (err) {
       console.error("createRoom error", err);
-      showToast("Could not connect to server. Is Spring Boot running?");
+      setCreateRoomError("Could not connect to server. Is Spring Boot running?");
     }
   };
 
@@ -1591,7 +1818,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
       if (url.startsWith("http://") || url.startsWith("https://")) return url;
       // Relative path — prefix with backend base
       return `http://192.168.100.127:8080${url.startsWith("/") ? "" : "/"}${url}`;
-    }; if (msg.type === "IMAGE") return (<img src={resolveUrl(msg.fileUrl)} alt="img" className="msg-img" onError={(e) => { e.target.style.border = "2px solid red"; e.target.alt = "Failed: " + resolveUrl(msg.fileUrl); }} />);
+    }; if (msg.type === "IMAGE") return (<img src={resolveUrl(msg.fileUrl)} alt="img" className="msg-img" onClick={() => setLightboxUrl(resolveUrl(msg.fileUrl))} onError={(e) => { e.target.style.border = "2px solid red"; e.target.alt = "Failed: " + resolveUrl(msg.fileUrl); }} />);
     if (msg.type === "FILE") return (<a href={resolveUrl(msg.fileUrl)} target="_blank" rel="noreferrer" className="msg-file"><span className="msg-file-ic"><IcoFile color="#fff" size={18} /></span><span>{msg.content || "Download File"}</span></a>);
     if (msg.type === "AUDIO") return (<audio controls src={resolveUrl(msg.fileUrl)} className="msg-audio" />);
     if (msg.type === "VIDEO") { const msgKey = msg.id || msg.fileUrl; return (<div style={{ position: "relative", display: "inline-block" }}><video ref={el => { if (el) videoRefs.current[msgKey] = el; }} src={resolveUrl(msg.fileUrl)} controls preload="metadata" style={{ maxWidth: 280, maxHeight: 200, borderRadius: 14, display: "block", boxShadow: "0 5px 22px rgba(0,0,0,0.28)" }} /><button onClick={() => videoRefs.current[msgKey]?.requestFullscreen()} style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.55)", border: "none", borderRadius: 6, color: "#fff", fontSize: 13, padding: "3px 7px", cursor: "pointer", lineHeight: 1 }} title="Fullscreen">⛶</button></div>); }
@@ -1621,15 +1848,102 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
     root.setProperty("--chat-font-scale", String(scale));
   }, [fontSize, compactMode]);
 
+  // Keep own profile in cache too
+  useEffect(() => {
+    if (myProfile && name) {
+      setProfileCache(prev => ({ ...prev, [name]: myProfile }));
+    }
+  }, [myProfile, name]); // eslint-disable-line
+
   const currentMessages = view === "dm" && activeDmUser ? (dmMessages[activeDmUser] || []) : view === "room" && activeRoom ? (roomMessages[activeRoom.id] || []) : messages;
 
   const saveFriends = (list) => { setFriends(list); localStorage.setItem(`friends_${authUser}`, JSON.stringify(list)); };
   const saveReqs = (list) => { setFriendReqs(list); localStorage.setItem(`friendreqs_${authUser}`, JSON.stringify(list)); };
-  const sendFriendReq = (user) => { if (friends.includes(user) || friendReqs.includes(user)) return; const outKey = `friendreqs_out_${user}`; const existing = JSON.parse(localStorage.getItem(outKey) || "[]"); if (!existing.includes(authUser)) { localStorage.setItem(outKey, JSON.stringify([...existing, authUser])); } saveReqs([...friendReqs, user]); if (stompClient.current?.connected) { stompClient.current.publish({ destination: "/app/send", body: JSON.stringify({ sender: name, content: `__FRIEND_REQUEST__`, type: "FRIEND_REQUEST", recipient: user }) }); } };
-  const acceptFriendReq = (user) => { saveFriends([...friends, user]); const incoming = JSON.parse(localStorage.getItem(`friendreqs_out_${authUser}`) || "[]"); localStorage.setItem(`friendreqs_out_${authUser}`, JSON.stringify(incoming.filter(u => u !== user))); };
+  const sendFriendReq = async (user) => {
+    if (!user?.trim()) return;
+
+    // Cannot add yourself
+    if (user.trim() === name) {
+      showToast("You cannot send a friend request to yourself.", "error");
+      return;
+    }
+
+    // Already friends
+    if (friends.includes(user)) {
+      showToast(`You are already friends with ${user}.`, "error");
+      return;
+    }
+
+    // Already sent
+    if (friendReqs.includes(user)) {
+      showToast(`You already sent a friend request to ${user}.`, "error");
+      return;
+    }
+
+    // Check if user exists on the server
+    const userExists = allUsers.includes(user.trim());
+    if (!userExists) {
+      // Double check via API in case allUsers is stale
+      try {
+        const token = authToken || localStorage.getItem("token");
+        const res = await fetch(`http://192.168.100.127:8080/auth/profile/${user.trim()}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          showToast(`User "${user}" does not exist.`, "error");
+          return;
+        }
+      } catch {
+        showToast(`Could not verify user "${user}". Check your connection.`, "error");
+        return;
+      }
+    }
+
+    const outKey = `friendreqs_out_${user}`;
+    const existing = JSON.parse(localStorage.getItem(outKey) || "[]");
+    if (!existing.includes(authUser)) {
+      localStorage.setItem(outKey, JSON.stringify([...existing, authUser]));
+    }
+    saveReqs([...friendReqs, user]);
+
+    if (stompClient.current?.connected) {
+      stompClient.current.publish({
+        destination: "/app/dm.send",
+        body: JSON.stringify({
+          sender: name,
+          recipient: user.trim(),
+          content: `__FRIEND_REQUEST__`,
+          type: "FRIEND_REQUEST",
+        })
+      });
+    }
+
+    showToast(`Friend request sent to ${user}!`, "success");
+  };
+  const acceptFriendReq = (user) => {
+    if (user === name || user === authUser) return;
+    saveFriends([...friends, user]);
+    const incoming = JSON.parse(localStorage.getItem(`friendreqs_out_${authUser}`) || "[]");
+    localStorage.setItem(`friendreqs_out_${authUser}`, JSON.stringify(incoming.filter(u => u !== user)));
+
+    // FIX: notify the requester that their request was accepted
+    // so their friends list updates in real time
+    if (stompClient.current?.connected) {
+      stompClient.current.publish({
+        destination: "/app/dm.send",
+        body: JSON.stringify({
+          sender: name,
+          recipient: user,
+          content: "__FRIEND_ACCEPTED__",
+          type: "FRIEND_ACCEPTED",
+        })
+      });
+    }
+  };
   const removeFriend = (user) => saveFriends(friends.filter(u => u !== user));
-  const incomingReqs = JSON.parse(localStorage.getItem(`friendreqs_out_${authUser}`) || "[]");
+  const incomingReqs = JSON.parse(localStorage.getItem(`friendreqs_out_${authUser}`) || "[]").filter(u => u !== authUser);
   const IC = dark ? "#a080d0" : "#7c4fbf";
+  const [showDmProfile, setShowDmProfile] = useState(false);
 
   const runMsgSearch = (q) => { setMsgSearchQ(q); if (!q.trim()) { setMsgSearchResults([]); setMsgSearchIdx(-1); return; } const lower = q.toLowerCase(); const hits = currentMessages.map((m, i) => ({ i, m })).filter(({ m }) => m.content && m.content.toLowerCase().includes(lower)); setMsgSearchResults(hits.map(h => h.i)); setMsgSearchIdx(hits.length > 0 ? hits.length - 1 : -1); if (hits.length > 0) scrollToMsg(hits[hits.length - 1]); };
   const scrollToMsg = (idx) => { const el = msgRefs.current[idx]; if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); };
@@ -1724,12 +2038,37 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
               </div>
               {rooms.map(room => (<div key={room.id} onClick={() => openRoom(room)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "room" && activeRoom?.id === room.id ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }} onMouseEnter={e => { if (!(view === "room" && activeRoom?.id === room.id)) e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }} onMouseLeave={e => { if (!(view === "room" && activeRoom?.id === room.id)) e.currentTarget.style.background = "transparent"; }}>
 
-                <div style={{ width: 32, height: 32, borderRadius: 10, background: room.iconUrl ? "transparent" : `linear-gradient(135deg,${["#7c3aed", "#06b6d4", "#ec4899", "#059669", "#f59e0b"][room.id % 5]},${["#a855f7", "#7c3aed", "#a855f7", "#06b6d4", "#ec4899"][room.id % 5]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0, overflow: "hidden" }}>{room.iconUrl ? <img src={room.iconUrl.startsWith("http") ? room.iconUrl : `http://192.168.100.127:8080${room.iconUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 10 }} /> : (room.emoji || "🌟")}</div>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg,${["#7c3aed", "#06b6d4", "#ec4899", "#059669", "#f59e0b"][room.id % 5]},${["#a855f7", "#7c3aed", "#a855f7", "#06b6d4", "#ec4899"][room.id % 5]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, overflow: "hidden", padding: 0, position: "relative" }}>
+                  {room.iconUrl
+                    ? <img
+                      src={(() => {
+                        const url = room.iconUrl;
+                        if (!url) return null;
+                        const base = "http://192.168.100.127:8080";
+                        return url.startsWith("http") ? url : `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+                      })()}
+                      alt={room.name}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 10, display: "block", position: "absolute", inset: 0 }}
+                      onError={e => {
+                        e.target.style.display = "none";
+                      }}
+                    />
+                    : (room.emoji || "🌟")
+                  }
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{room.name}</div><div style={{ fontSize: 11, color: "var(--text-sub)" }}>{room.description || "Room"}</div></div>
                 {roomUnread[room.id] > 0 && <div style={{ minWidth: 18, height: 18, borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{roomUnread[room.id]}</div>}
               </div>))}
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--accent)", opacity: 0.7, padding: "14px 10px 5px", display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 8, opacity: 0.6 }}>✦</span> Direct Messages</div>
-              {friends.filter(u => u !== name && (!searchQ || u.toLowerCase().includes(searchQ.toLowerCase()))).map((user, i) => { const gradients = ["linear-gradient(135deg,#7c3aed,#a855f7)", "linear-gradient(135deg,#06b6d4,#7c3aed)", "linear-gradient(135deg,#ec4899,#a855f7)", "linear-gradient(135deg,#059669,#06b6d4)", "linear-gradient(135deg,#f59e0b,#ec4899)"]; const grad = gradients[user.charCodeAt(0) % gradients.length]; return (<div key={i} onClick={() => openDm(user)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "dm" && activeDmUser === user ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }} onMouseEnter={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }} onMouseLeave={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "transparent"; }}>{view === "dm" && activeDmUser === user && <div style={{ position: "absolute", left: 0, top: "20%", height: "60%", width: 3, background: "var(--accent)", borderRadius: "0 3px 3px 0" }} />}<div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: grad, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{user[0].toUpperCase()}<div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: onlineUsers.includes(user) ? "#10b981" : "rgba(255,255,255,0.2)", border: "2px solid var(--glass2)", boxShadow: onlineUsers.includes(user) ? "0 0 5px #10b981" : "none" }} /></div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user}</div><div style={{ fontSize: 11, color: onlineUsers.includes(user) ? "#10b981" : "var(--text-sub)" }}>{onlineUsers.includes(user) ? "● Active" : "○ Offline"}</div></div>{dmUnread[user] > 0 && <div style={{ minWidth: 18, height: 18, borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{dmUnread[user]}</div>}</div>); })}
+              {(searchQ.trim()
+                ? allUsers.filter(u => u !== name && u.toLowerCase().includes(searchQ.toLowerCase()))
+                : friends.filter(u => u !== name)
+              ).map((user, i) => {
+                const gradients = ["linear-gradient(135deg,#7c3aed,#a855f7)", "linear-gradient(135deg,#06b6d4,#7c3aed)", "linear-gradient(135deg,#ec4899,#a855f7)", "linear-gradient(135deg,#059669,#06b6d4)", "linear-gradient(135deg,#f59e0b,#ec4899)"]; const grad = gradients[user.charCodeAt(0) % gradients.length]; return (<div key={i} onClick={() => openDm(user)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 2, background: view === "dm" && activeDmUser === user ? "rgba(124,58,237,0.18)" : "transparent", transition: "background 0.15s", position: "relative" }} onMouseEnter={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }} onMouseLeave={e => { if (!(view === "dm" && activeDmUser === user)) e.currentTarget.style.background = "transparent"; }}>{view === "dm" && activeDmUser === user && <div style={{ position: "absolute", left: 0, top: "20%", height: "60%", width: 3, background: "var(--accent)", borderRadius: "0 3px 3px 0" }} />}<div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: grad, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0, overflow: "hidden" }}>
+                  {getAvatar(user)
+                    ? <img src={getAvatar(user)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", position: "absolute", inset: 0 }} onError={e => { e.target.style.display = "none"; }} />
+                    : user[0].toUpperCase()}<div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: onlineUsers.includes(user) ? "#10b981" : "rgba(255,255,255,0.2)", border: "2px solid var(--glass2)", boxShadow: onlineUsers.includes(user) ? "0 0 5px #10b981" : "none" }} /></div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user}</div><div style={{ fontSize: 11, color: onlineUsers.includes(user) ? "#10b981" : "var(--text-sub)" }}>{onlineUsers.includes(user) ? "● Active" : "○ Offline"}</div></div>{dmUnread[user] > 0 && <div style={{ minWidth: 18, height: 18, borderRadius: 999, background: "var(--accent)", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>{dmUnread[user]}</div>}</div>);
+              })}
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--accent)", opacity: 0.7, padding: "14px 10px 5px", display: "flex", alignItems: "center", gap: 6 }}><span style={{ fontSize: 8, opacity: 0.6 }}>✦</span> Online — {onlineUsers.filter(u => u !== name && friends.includes(u)).length}</div>
               {onlineUsers.filter(u => u !== name && friends.includes(u)).map((user, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, marginBottom: 2 }}><div style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{user[0].toUpperCase()}<div style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: "#10b981", border: "2px solid var(--glass2)", boxShadow: "0 0 5px #10b981" }} /></div><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user}{user === name ? " (you)" : ""}</div><div style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 3 }}>
                 {user === name ? <><span style={{ fontSize: 10 }}>🟢</span><span style={{ color: "#10b981", fontWeight: 600 }}>ONLINE</span></> : typingUsers.includes(user) ? <span style={{ color: "var(--accent)" }}>✍️ typing…</span> : <>
@@ -1740,115 +2079,240 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
             </div>
             <div style={{ padding: "8px 10px", borderTop: "1px solid var(--divider)", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, background: "var(--glass2)", position: "relative" }}>
               {/* Discord-style profile popup */}
-              {showProfilePopup && (
+              {showProfilePopup && ReactDOM.createPortal(
                 <div
                   ref={profilePopupRef}
                   style={{
-                    position: "fixed", bottom: 76, left: 8, zIndex: 1000,
-                    width: 260,
-                    background: dark ? "#1e1f22" : "#ffffff",
+                    position: "fixed",
+                    bottom: 70,
+                    left: 8,
+                    zIndex: 99999,
+                    width: 280,
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
                     borderRadius: 8,
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)",
-                    overflow: "visible",
-                    fontFamily: "inherit",
+                    overflow: "hidden",
+                    boxShadow: "0 16px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05)",
                   }}>
 
-                  {/* Banner */}
+                  {/* Top section — banner + avatar + name */}
                   <div style={{
-                    height: 60,
-                    background: "linear-gradient(135deg,#5865f2,#7b8cff)",
-                    borderRadius: "8px 8px 0 0",
-                  }} />
-
-                  {/* Avatar ring — sits on top of banner, not clipped */}
-                  <div style={{
-                    position: "absolute", top: 28, left: 16,
-                    width: 56, height: 56,
-                    borderRadius: "50%",
-                    background: dark ? "#1e1f22" : "#ffffff",
-                    padding: 4,
-                    boxSizing: "border-box",
-                    zIndex: 3,
+                    background: dark ? "#1e1f22" : "#f2f3f5",
+                    position: "relative",
                   }}>
+                    {/* Banner */}
                     <div style={{
-                      width: "100%", height: "100%", borderRadius: "50%",
-                      background: "var(--bubble-me)", overflow: "hidden",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 20, fontWeight: 700, color: "#fff", position: "relative",
+                      height: 60,
+                      background: "linear-gradient(135deg, #5865f2 0%, #7b8cff 100%)",
+                    }} />
+
+                    {/* Avatar */}
+                    <div style={{
+                      position: "absolute",
+                      top: 24,
+                      left: 12,
+                      width: 62,
+                      height: 62,
+                      borderRadius: "50%",
+                      padding: 4,
+                      background: dark ? "#1e1f22" : "#f2f3f5",
+                      boxSizing: "border-box",
                     }}>
-                      {myProfile?.avatarUrl
-                        ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : name[0]?.toUpperCase()}
-                      {/* Status dot */}
                       <div style={{
-                        position: "absolute", bottom: 1, right: 1,
-                        width: 14, height: 14, borderRadius: "50%",
-                        background: ({ ONLINE: "#23a55a", IDLE: "#f0b232", DND: "#ed4245", INVISIBLE: "#80848e" })[myMood] || "#23a55a",
-                        border: `3px solid ${dark ? "#1e1f22" : "#ffffff"}`,
-                      }} />
+                        width: "100%",
+                        height: "100%",
+                        borderRadius: "50%",
+                        background: "linear-gradient(135deg,#c46dff,#7b8cff)",
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 22,
+                        fontWeight: 700,
+                        color: "#fff",
+                        position: "relative",
+                      }}>
+                        {myProfile?.avatarUrl
+                          ? <img
+                            src={myProfile.avatarUrl.startsWith("http")
+                              ? myProfile.avatarUrl
+                              : `http://192.168.100.127:8080${myProfile.avatarUrl}`}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                          : name[0]?.toUpperCase()
+                        }
+                        {/* Status indicator */}
+                        <div style={{
+                          position: "absolute",
+                          bottom: 1, right: 1,
+                          width: 15, height: 15,
+                          borderRadius: "50%",
+                          background: ({
+                            ONLINE: "#23a55a",
+                            IDLE: "#f0b232",
+                            DND: "#ed4245",
+                            INVISIBLE: "#80848e"
+                          })[myMood] || "#23a55a",
+                          border: `3px solid ${dark ? "#1e1f22" : "#f2f3f5"}`,
+                        }} />
+                      </div>
+                    </div>
+
+                    {/* Name + username */}
+                    <div style={{ padding: "46px 12px 12px" }}>
+                      <div style={{
+                        fontSize: 15,
+                        fontWeight: 800,
+                        color: dark ? "#f2f3f5" : "#060607",
+                        lineHeight: 1.3,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}>
+                        {myProfile?.displayName || name}
+                      </div>
+                      <div style={{
+                        fontSize: 12,
+                        color: dark ? "#949ba4" : "#4e5058",
+                        marginTop: 2,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}>
+                        {name}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Name block */}
+                  {/* Bottom section — menu items */}
                   <div style={{
-                    padding: "36px 16px 12px",
-                    borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`,
+                    background: dark ? "#111214" : "#ffffff",
+                    padding: "6px 8px 8px",
                   }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: dark ? "#f2f3f5" : "#060607", lineHeight: 1.3 }}>
-                      {myProfile?.displayName || name}
-                    </div>
-                    <div style={{ fontSize: 12, color: dark ? "#949ba4" : "#4e5058", marginTop: 2 }}>
-                      {name}
-                    </div>
-                  </div>
-
-                  {/* Menu items */}
-                  <div style={{ padding: "6px 8px 8px" }}>
 
                     {/* Edit Profile */}
                     <button
-                      onClick={(e) => { e.stopPropagation(); setShowProfilePopup(false); setTimeout(() => setShowProfile(true), 50); }}
-                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 4, border: "none", background: "transparent", color: dark ? "#dcddde" : "#2e3338", fontFamily: "inherit", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
-                      onMouseEnter={e => e.currentTarget.style.background = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowProfilePopup(false);
+                        setTimeout(() => setShowProfile(true), 50);
+                      }}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center",
+                        gap: 8, padding: "9px 10px", borderRadius: 3,
+                        border: "none", background: "transparent",
+                        color: dark ? "#dbdee1" : "#2e3338",
+                        fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                        cursor: "pointer", textAlign: "left",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = "#5865f2";
+                        e.currentTarget.style.color = "#fff";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = dark ? "#dbdee1" : "#2e3338";
+                      }}>
                       ✏️ Edit Profile
                     </button>
 
-                    {/* Status button */}
+                    {/* Status */}
                     <button
                       onClick={() => setShowStatusMenu(v => !v)}
-                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 4, border: "none", background: "transparent", color: dark ? "#dcddde" : "#2e3338", fontFamily: "inherit", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
-                      onMouseEnter={e => e.currentTarget.style.background = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <span style={{ width: 12, height: 12, borderRadius: "50%", background: ({ ONLINE: "#23a55a", IDLE: "#f0b232", DND: "#ed4245", INVISIBLE: "#80848e" })[myMood] || "#23a55a", flexShrink: 0 }} />
-                      <span style={{ flex: 1 }}>{({ ONLINE: "Online", IDLE: "Idle", DND: "Do Not Disturb", INVISIBLE: "Invisible" })[myMood] || "Online"}</span>
-                      <span style={{ opacity: 0.4, fontSize: 12 }}>›</span>
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center",
+                        gap: 8, padding: "9px 10px", borderRadius: 3,
+                        border: "none",
+                        background: showStatusMenu ? "#5865f2" : "transparent",
+                        color: showStatusMenu ? "#fff" : (dark ? "#dbdee1" : "#2e3338"),
+                        fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                        cursor: "pointer", textAlign: "left",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = "#5865f2";
+                        e.currentTarget.style.color = "#fff";
+                      }}
+                      onMouseLeave={e => {
+                        if (!showStatusMenu) {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.color = dark ? "#dbdee1" : "#2e3338";
+                        }
+                      }}>
+                      <span style={{
+                        width: 10, height: 10, borderRadius: "50%", flexShrink: 0,
+                        background: ({
+                          ONLINE: "#23a55a",
+                          IDLE: "#f0b232",
+                          DND: "#ed4245",
+                          INVISIBLE: "#80848e"
+                        })[myMood] || "#23a55a",
+                      }} />
+                      <span style={{ flex: 1 }}>
+                        {({ ONLINE: "Online", IDLE: "Idle", DND: "Do Not Disturb", INVISIBLE: "Invisible" })[myMood] || "Online"}
+                      </span>
+                      <span style={{ fontSize: 11, opacity: 0.6 }}>›</span>
                     </button>
 
                     {/* Status submenu */}
                     {showStatusMenu && (
-                      <div style={{ background: dark ? "#111214" : "#f2f3f5", borderRadius: 6, margin: "2px 0 4px", overflow: "hidden", border: `1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)"}` }}>
+                      <div style={{
+                        background: dark ? "#1a1b1e" : "#f2f3f5",
+                        borderRadius: 4,
+                        margin: "2px 0 4px",
+                        overflow: "hidden",
+                        border: `1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.1)"}`,
+                      }}>
                         {[
-                          { v: "ONLINE",    label: "Online",          desc: "",                                           dot: "#23a55a" },
-                          { v: "IDLE",      label: "Idle",            desc: "",                                           dot: "#f0b232" },
-                          { v: "DND",       label: "Do Not Disturb",  desc: "You will not receive notifications",         dot: "#ed4245" },
-                          { v: "INVISIBLE", label: "Invisible",       desc: "You will appear offline to others",          dot: "#80848e" },
+                          { v: "ONLINE", label: "Online", desc: "", dot: "#23a55a" },
+                          { v: "IDLE", label: "Idle", desc: "", dot: "#f0b232" },
+                          { v: "DND", label: "Do Not Disturb", desc: "Mutes all notifications", dot: "#ed4245" },
+                          { v: "INVISIBLE", label: "Invisible", desc: "Appear offline to others", dot: "#80848e" },
                         ].map(s => (
                           <button key={s.v}
                             onClick={() => {
                               setMyMood(s.v);
-                              fetch(`http://192.168.100.127:8080/auth/mood`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }, body: JSON.stringify({ mood: s.v }) }).catch(() => {});
-                              if (stompClient.current?.connected) stompClient.current.publish({ destination: "/app/presence", body: JSON.stringify({ sender: nameRef.current, status: s.v === "INVISIBLE" ? "OFFLINE" : "ONLINE" }) });
+                              fetch(`http://192.168.100.127:8080/auth/mood`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+                                body: JSON.stringify({ mood: s.v })
+                              }).catch(() => { });
+                              if (stompClient.current?.connected) {
+                                stompClient.current.publish({
+                                  destination: "/app/presence",
+                                  body: JSON.stringify({
+                                    sender: nameRef.current,
+                                    status: s.v === "INVISIBLE" ? "OFFLINE" : "ONLINE"
+                                  })
+                                });
+                              }
                               setShowStatusMenu(false);
                               setShowProfilePopup(false);
                             }}
-                            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "none", background: myMood === s.v ? "rgba(88,101,242,0.18)" : "transparent", color: dark ? "#dcddde" : "#2e3338", fontFamily: "inherit", fontSize: 13, cursor: "pointer", textAlign: "left" }}
-                            onMouseEnter={e => { if (myMood !== s.v) e.currentTarget.style.background = dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"; }}
-                            onMouseLeave={e => { if (myMood !== s.v) e.currentTarget.style.background = "transparent"; }}>
-                            <span style={{ width: 10, height: 10, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
+                            style={{
+                              width: "100%", display: "flex", alignItems: "center",
+                              gap: 10, padding: "9px 12px", border: "none",
+                              background: myMood === s.v ? "rgba(88,101,242,0.2)" : "transparent",
+                              color: dark ? "#dbdee1" : "#2e3338",
+                              fontFamily: "inherit", fontSize: 13,
+                              cursor: "pointer", textAlign: "left",
+                            }}
+                            onMouseEnter={e => {
+                              if (myMood !== s.v) e.currentTarget.style.background = "rgba(88,101,242,0.15)";
+                            }}
+                            onMouseLeave={e => {
+                              if (myMood !== s.v) e.currentTarget.style.background = "transparent";
+                            }}>
+                            <span style={{
+                              width: 10, height: 10, borderRadius: "50%",
+                              background: s.dot, flexShrink: 0,
+                            }} />
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 600, fontSize: 13 }}>{s.label}</div>
-                              {s.desc && <div style={{ fontSize: 11, color: dark ? "#949ba4" : "#4e5058", marginTop: 1 }}>{s.desc}</div>}
+                              {s.desc && (
+                                <div style={{ fontSize: 11, color: dark ? "#949ba4" : "#4e5058", marginTop: 1 }}>
+                                  {s.desc}
+                                </div>
+                              )}
                             </div>
                             {myMood === s.v && <span style={{ color: "#23a55a", fontSize: 13 }}>✓</span>}
                           </button>
@@ -1856,29 +2320,82 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
                       </div>
                     )}
 
-                    <div style={{ height: 1, background: dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)", margin: "6px 2px" }} />
+                    {/* Divider */}
+                    <div style={{
+                      height: 1,
+                      background: dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)",
+                      margin: "4px 2px",
+                    }} />
 
                     {/* Settings */}
                     <button
-                      onClick={(e) => { e.stopPropagation(); setShowProfilePopup(false); setTimeout(() => { setSettingsTab("account"); setShowSettings(true); }, 50); }}
-                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 4, border: "none", background: "transparent", color: dark ? "#dcddde" : "#2e3338", fontFamily: "inherit", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
-                      onMouseEnter={e => e.currentTarget.style.background = dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowProfilePopup(false);
+                        setTimeout(() => { setSettingsTab("account"); setShowSettings(true); }, 50);
+                      }}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center",
+                        gap: 8, padding: "9px 10px", borderRadius: 3,
+                        border: "none", background: "transparent",
+                        color: dark ? "#dbdee1" : "#2e3338",
+                        fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                        cursor: "pointer", textAlign: "left",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = "#5865f2";
+                        e.currentTarget.style.color = "#fff";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = dark ? "#dbdee1" : "#2e3338";
+                      }}>
                       ⚙️ Settings
                     </button>
 
+                    {/* Divider */}
+                    <div style={{
+                      height: 1,
+                      background: dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.08)",
+                      margin: "4px 2px",
+                    }} />
+
                     {/* Log Out */}
                     <button
-                      onClick={(e) => { e.stopPropagation(); setShowProfilePopup(false); setTimeout(() => { if (callMode) endCall(0); stompClient.current?.deactivate(); onLogout(); }, 50); }}
-                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: 4, border: "none", background: "transparent", color: "#ed4245", fontFamily: "inherit", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "rgba(237,66,69,0.1)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowProfilePopup(false);
+                        setTimeout(() => {
+                          if (callMode) endCall(0);
+                          stompClient.current?.deactivate();
+                          onLogout();
+                        }, 50);
+                      }}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center",
+                        gap: 8, padding: "9px 10px", borderRadius: 3,
+                        border: "none", background: "transparent",
+                        color: "#ed4245",
+                        fontFamily: "inherit", fontSize: 14, fontWeight: 500,
+                        cursor: "pointer", textAlign: "left",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = "#ed4245";
+                        e.currentTarget.style.color = "#fff";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = "#ed4245";
+                      }}>
                       🚪 Log Out
                     </button>
 
                   </div>
-                </div>
+                </div>,
+                document.body
               )}
+
+
               {/* Avatar button */}
               <div onClick={e => { e.stopPropagation(); setShowProfilePopup(v => !v); setShowStatusMenu(false); }} style={{ position: "relative", width: 34, height: 34, borderRadius: "50%", background: "var(--bubble-me)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", flexShrink: 0, overflow: "hidden" }}>
                 {myProfile?.avatarUrl ? <img src={myProfile.avatarUrl.startsWith("http") ? myProfile.avatarUrl : `http://192.168.100.127:8080${myProfile.avatarUrl}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} /> : name[0]?.toUpperCase()}
@@ -1906,7 +2423,7 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
                 <button className="h-btn" title={callMode === "voice" ? "Leave voice channel" : "Join voice channel"} style={callMode === "voice" ? { color: "#22c55e" } : {}} onClick={() => callMode === "voice" ? endCall(0) : joinVoiceChannel()}><IcoPhone color={callMode === "voice" ? "#22c55e" : IC} size={19} /></button>
                 <button className="h-btn" title={callMode === "video" ? "End video call" : "Start video call"} style={callMode === "video" ? { color: "#22c55e" } : {}} onClick={() => callMode === "video" ? endCall(0) : startCall("video")}><IcoVideo color={callMode === "video" ? "#22c55e" : IC} size={19} /></button>
                 <button className="h-btn" title="Search messages" onClick={() => { setShowMsgSearch(v => !v); setMsgSearchQ(""); setMsgSearchResults([]); setMsgSearchIdx(-1); }}><IcoSearch color={IC} size={17} /></button>
-                <button className="h-btn" title="Room Info" onClick={() => { if (view === "room" && activeRoom) setShowRoomInfo(v => !v); }}><IcoInfo color={view === "room" && showRoomInfo ? "var(--accent)" : IC} size={19} /></button>
+                <button className="h-btn" title="Info" onClick={() => { if (view === "room" && activeRoom) setShowRoomInfo(v => !v); if (view === "dm" && activeDmUser) setShowDmProfile(v => !v); }}><IcoInfo color={view === "room" && showRoomInfo ? "var(--accent)" : IC} size={19} /></button>
               </div>
             </div>
             {showMsgSearch && (<div className="msg-search-bar"><input className="msg-search-input" placeholder="Search messages…" value={msgSearchQ} onChange={e => runMsgSearch(e.target.value)} autoFocus /><div className="msg-search-nav"><button className="msg-search-btn" onClick={searchPrev} title="Previous">▲</button><span className="msg-search-count">{msgSearchResults.length === 0 ? "0/0" : `${msgSearchResults.length - msgSearchIdx}/${msgSearchResults.length}`}</span><button className="msg-search-btn" onClick={searchNext} title="Next">▼</button></div><button className="msg-search-btn" onClick={() => { setShowMsgSearch(false); setMsgSearchQ(""); setMsgSearchResults([]); setMsgSearchIdx(-1); }}>✕</button></div>)}
@@ -1918,7 +2435,12 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
                   const me = msg.sender === name; const msgReactions = getReactions(msg.id); const isSearchHit = msgSearchResults.includes(i); const isActiveHit = msgSearchResults[msgSearchIdx] === i;
                   return (<div key={i} ref={el => msgRefs.current[i] = el} className={`msg-group ${me ? "me" : "other"}`} style={isActiveHit ? { outline: "2px solid var(--accent)", borderRadius: 14, outlineOffset: 2 } : isSearchHit ? { outline: "1px solid rgba(196,109,255,0.4)", borderRadius: 14, outlineOffset: 2 } : {}}>
                     {!me && <div className="msg-sender">{msg.sender}</div>}
-                    <div className="msg-row">{!me && <div className="mini-av">{initial(msg.sender)}</div>}
+                    <div className="msg-row">{!me && <div className="mini-av" style={{ overflow: "hidden", padding: 0 }}>
+                      {getAvatar(msg.sender)
+                        ? <img src={getAvatar(msg.sender)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={e => { e.target.style.display = "none"; }} />
+                        : initial(msg.sender)
+                      }
+                    </div>}
                       <div className={`msg-bubble${msg.type === "IMAGE" ? " is-image" : ""}${msg.deleted ? " deleted" : ""}`}>
                         {renderContent(msg)}
                         {!msg.deleted && (<div className="msg-actions"><button className="action-btn" title="React" onClick={() => sendReaction(msg.id, "❤️")}><span style={{ fontSize: 13 }}>❤️</span></button><button className="action-btn" title="React 👍" onClick={() => sendReaction(msg.id, "👍")}><span style={{ fontSize: 13 }}>👍</span></button>{me && !msg.deleted && !msg.fileUrl && (!msg.type || msg.type === "TEXT") && (<button className="action-btn" title="Edit" onClick={() => startEdit(msg)}><IcoEdit color={IC} size={14} /></button>)}{me && !msg.deleted && <button className="action-btn" title="Delete" onClick={() => deleteMessage(msg.id)}><IcoTrash size={14} /></button>}</div>)}
@@ -1976,6 +2498,18 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
           }} />
           <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileChange} />
 
+          {view === "dm" && showDmProfile && activeDmUser && (
+            <div style={{ width: 280, borderLeft: "1px solid var(--divider)", height: "100%", background: "var(--glass2)", display: "flex", flexDirection: "column", flexShrink: 0, padding: 24, gap: 16, alignItems: "center" }}>
+              <button onClick={() => setShowDmProfile(false)} style={{ alignSelf: "flex-end", background: "var(--btn-bg)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "var(--text-muted)", fontSize: 15 }}>✕</button>
+              <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--bubble-me)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, color: "#fff", overflow: "hidden" }}>
+                {getAvatar(activeDmUser) ? <img src={getAvatar(activeDmUser)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : activeDmUser[0]?.toUpperCase()}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{profileCache[activeDmUser]?.displayName || activeDmUser}</div>
+              <div style={{ fontSize: 13, color: "var(--text-sub)" }}>@{activeDmUser}</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center" }}>{profileCache[activeDmUser]?.bio || "No bio yet."}</div>
+            </div>
+          )}
+
         </div>
         {callMode && !callMinimized && (
           <CallOverlay key={callKey} mode={callMode} myName={name} stompClient={stompClient} onEnd={endCall} onMinimize={() => setCallMinimized(true)} />
@@ -2029,6 +2563,55 @@ export default function WebSocketClient({ authUser, authToken, onLogout }) {
         ))}
       </div>
       {showProfile && <ProfileModal onClose={() => setShowProfile(false)} authToken={authToken} user={{ ...myProfile, username: name }} onUpdate={(data) => setMyProfile(prev => ({ ...prev, ...data }))} />}
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.92)", backdropFilter: "blur(12px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "zoom-out", animation: "fadeIn 0.15s",
+          }}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            style={{
+              position: "fixed", top: 18, right: 22, background: "rgba(255,255,255,0.1)",
+              border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%",
+              width: 40, height: 40, fontSize: 20, color: "#fff", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 10000,
+            }}
+          >
+            {"✕"}
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="preview"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: "92vw", maxHeight: "88vh",
+              borderRadius: 12, boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
+              objectFit: "contain", cursor: "default",
+              animation: "scalePop 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+            }}
+          />
+
+          <a
+            href={lightboxUrl}
+            download
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+              background: "rgba(255,255,255,0.12)", border: "1px solidAA rgba(255,255,255,0.2)",
+              borderRadius: 10, padding: "8px 22px", color: "#fff", textDecoration: "none",
+              fontSize: 13, fontWeight: 600, backdropFilter: "blur(8px)",
+            }}
+          >
+            {"Download"}
+          </a>
+        </div>
+      )}
     </>
   );
 }

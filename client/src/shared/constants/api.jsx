@@ -2,9 +2,9 @@
 // All server addresses and API-level configuration in one place.
 // Change BASE_URL here and every fetch / WebSocket in the app updates.
 
-export const BASE_URL = "http://192.168.100.127:8080";
+export const BASE_URL = "";
 
-export const WS_URL = `${BASE_URL}/ws`;
+export const WS_URL = "/ws";
 
 export const API_ROUTES = {
   // Auth
